@@ -24,7 +24,9 @@ class ShopifyService
     public function getProducts()
     {
         return Http::withHeaders($this->headers())
-            ->get("https://{$this->shop->shop_domain}/admin/api/2025-01/products.json")
+            ->get("https://{$this->shop->shop_domain}/admin/api/2025-01/products.json", [
+                'status' => 'active'
+            ])
             ->json();
     }
 
