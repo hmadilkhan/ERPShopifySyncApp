@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ShopifyShop;
+use App\Services\ShopifyService;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -58,5 +59,22 @@ Route::get('/shopify/callback', function (Request $request) {
         ]
     );
 
+    // 🔹 Register Webhooks here
+    registerShopifyWebhook($shop, $token, 'orders/create', '/shopify/webhook/orders');
+    registerShopifyWebhook($shop, $token, 'inventory_levels/update', '/shopify/webhook/inventory');
+    registerShopifyWebhook($shop, $token, 'orders/updated', '/shopify/webhook/order-updated');
+
     return "✅ Shopify app installed successfully for {$shop}";
+});
+
+Route::get('/shopify/test-products', function () {
+    $shop = ShopifyShop::first();
+    $service = new ShopifyService($shop);
+    return $service->getProducts();
+});
+
+Route::get('/shopify/test-orders', function () {
+    $shop = ShopifyShop::first();
+    $service = new ShopifyService($shop);
+    return $service->getOrders();
 });
