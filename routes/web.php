@@ -78,6 +78,16 @@ Route::get('/shopify/test-webhook', function () {
     );
 });
 
+Route::get('/shopify/list-webhooks', function () {
+    $shop = ShopifyShop::first(); // or find the shop you want
+
+    $response = Http::withHeaders([
+        'X-Shopify-Access-Token' => $shop->access_token,
+    ])->get("https://{$shop->shop_domain}/admin/api/2025-01/webhooks.json");
+
+    return $response->json();
+});
+
 Route::get('/shopify/test-products', function () {
     $shop = ShopifyShop::first();
     $service = new ShopifyService($shop);
