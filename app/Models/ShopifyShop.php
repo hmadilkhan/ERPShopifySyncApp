@@ -6,5 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class ShopifyShop extends Model
 {
-    //
+    protected $fillable = [
+        'shop_domain',
+        'access_token',
+        'scope',
+        'name',
+        'email',
+        'currency',
+        'timezone',
+        'is_active',
+    ];
 }
