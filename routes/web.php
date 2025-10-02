@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ShopifyShop;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -28,20 +29,34 @@ Route::get('/shopify/callback', function (Request $request) {
     $apiKey = config('shopify.api_key');
     $secret = config('shopify.api_secret');
 
-    // Exchange code for access token
+    // 1. Exchange code for access token
     $response = Http::post("https://{$shop}/admin/oauth/access_token", [
         'client_id' => $apiKey,
         'client_secret' => $secret,
         'code' => $code
-    ]);
+    ])->json();
 
     $token = $response['access_token'];
 
-    // Save $shop + $token in DB for future API calls
-    \DB::table('shopify_shops')->updateOrInsert(
-        ['shop' => $shop],
-        ['access_token' => $token]
+    // 2. Fetch shop info using the access token
+    $shopInfo = Http::withHeaders([
+        'X-Shopify-Access-Token' => $token,
+    ])->get("https://{$shop}/admin/api/2025-01/shop.json")
+        ->json()['shop'];
+
+    // 3. Save shop + token + shop info in DB
+    ShopifyShop::updateOrCreate(
+        ['shop_domain' => $shop], // unique
+        [
+            'access_token' => $token,
+            'scope'        => $response['scope'] ?? null,
+            'name'         => $shopInfo['name'] ?? null,
+            'email'        => $shopInfo['email'] ?? null,
+            'currency'     => $shopInfo['currency'] ?? null,
+            'timezone'     => $shopInfo['iana_timezone'] ?? null,
+            'is_active'    => true,
+        ]
     );
 
-    return "Shopify app installed successfully!";
+    return "✅ Shopify app installed successfully for {$shop}";
 });
