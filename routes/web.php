@@ -111,7 +111,7 @@ Route::get('/shopify/create-product', function () {
             "title"       => "Blink",
             "body_html"   => "<strong>Good product!</strong>",
             "vendor"      => "ERP System",
-            "product_type"=> "Shoes",
+            "product_type" => "Shoes",
             "status"      => "active",
             "variants"    => [
                 [

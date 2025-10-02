@@ -1,0 +1,87 @@
+📝 Standard JSON Contracts (for all ERPs)
+1. Product Sync Payload (ERP → SYNC)
+{
+  "product": {
+    "sku": "ERP-SKU-001",
+    "title": "Red Sports Shoes",
+    "description": "High quality running shoes",
+    "price": 99.99,
+    "currency": "USD",
+    "stock": 25,
+    "vendor": "ERP Vendor",
+    "product_type": "Shoes",
+    "status": "active",
+    "variants": [
+      {
+        "sku": "ERP-SKU-001-RED",
+        "option": "Red",
+        "price": 99.99,
+        "stock": 10
+      },
+      {
+        "sku": "ERP-SKU-001-BLUE",
+        "option": "Blue",
+        "price": 109.99,
+        "stock": 15
+      }
+    ],
+    "images": [
+      "https://erp.example.com/images/sku-001-red.jpg",
+      "https://erp.example.com/images/sku-001-blue.jpg"
+    ]
+  }
+}
+
+
+✅ If ERP sends wrong/missing fields → SYNC rejects with 422 error.
+
+2. Stock Update Payload (ERP → SYNC)
+{
+  "stock_update": {
+    "sku": "ERP-SKU-001-RED",
+    "quantity": 12
+  }
+}
+
+3. Order Status Update Payload (ERP → SYNC)
+{
+  "order_update": {
+    "shopify_order_id": 5346723895,
+    "erp_order_id": "ORD-4455",
+    "status": "shipped",
+    "tracking_number": "TCS1234567",
+    "tracking_url": "https://tcs.com/track/TCS1234567"
+  }
+}
+
+4. Order Create Payload (SYNC → ERP, when Shopify sends webhook)
+{
+  "order": {
+    "shopify_order_id": 5346723895,
+    "order_number": "#1001",
+    "status": "paid",
+    "total": 199.99,
+    "currency": "USD",
+    "customer": {
+      "first_name": "Ali",
+      "last_name": "Khan",
+      "email": "ali@example.com",
+      "phone": "+92 333 1234567",
+      "address": "123 Main Street, Lahore"
+    },
+    "items": [
+      {
+        "sku": "ERP-SKU-001-RED",
+        "title": "Red Sports Shoes",
+        "quantity": 1,
+        "price": 99.99
+      },
+      {
+        "sku": "ERP-SKU-001-BLUE",
+        "title": "Blue Sports Shoes",
+        "quantity": 1,
+        "price": 109.99
+      }
+    ]
+  }
+}

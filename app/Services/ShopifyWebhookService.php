@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+use App\Models\ShopifyShop;
+
+class ShopifyWebhookService
+{
+    public static function register(ShopifyShop $shop)
+    {
+        $topics = [
+            'orders/create',
+            'orders/updated',
+            'products/create',
+            'products/update',
+            'products/delete',
+            'inventory_levels/update',
+        ];
+
+        foreach ($topics as $topic) {
+            Http::withHeaders([
+                'X-Shopify-Access-Token' => $shop->access_token,
+            ])->post("https://{$shop->shop_domain}/admin/api/2025-01/webhooks.json", [
+                "webhook" => [
+                    "topic" => $topic,
+                    "address" => config('app.url') . "/webhooks/shopify/{$topic}",
+                    "format" => "json",
+                ]
+            ]);
+        }
+    }
+}
