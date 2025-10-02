@@ -99,3 +99,39 @@ Route::get('/shopify/test-orders', function () {
     $service = new ShopifyService($shop);
     return $service->getOrders();
 });
+
+Route::get('/shopify/create-product', function () {
+    $shop = ShopifyShop::first(); // pick your saved shop
+    if (!$shop) {
+        return "No shop found!";
+    }
+
+    $payload = [
+        "product" => [
+            "title"       => "Blink",
+            "body_html"   => "<strong>Good product!</strong>",
+            "vendor"      => "ERP System",
+            "product_type"=> "Shoes",
+            "status"      => "active",
+            "variants"    => [
+                [
+                    "option1" => "Default Title",
+                    "price"   => "99.99",
+                    "sku"     => "ERP-SKU-001",
+                    "inventory_quantity" => 10
+                ]
+            ],
+            "images" => [
+                [
+                    "src" => "https://retail.sabsoft.com.pk/storage/images/products/1669024269cloud%20printer.png.png"
+                ]
+            ]
+        ]
+    ];
+
+    $response = Http::withHeaders([
+        'X-Shopify-Access-Token' => $shop->access_token,
+    ])->post("https://{$shop->shop_domain}/admin/api/2025-01/products.json", $payload);
+
+    return $response->json();
+});
