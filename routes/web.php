@@ -67,6 +67,17 @@ Route::get('/shopify/callback', function (Request $request) {
     return "✅ Shopify app installed successfully for {$shop}";
 });
 
+
+Route::get('/shopify/test-webhook', function () {
+    $shop = ShopifyShop::first(); // get your saved shop
+    return registerShopifyWebhook(
+        $shop->shop_domain,
+        $shop->access_token,
+        'orders/create',
+        '/shopify/webhook/orders'
+    );
+});
+
 Route::get('/shopify/test-products', function () {
     $shop = ShopifyShop::first();
     $service = new ShopifyService($shop);
