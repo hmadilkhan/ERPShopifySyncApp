@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <title>ERP Setup</title>
@@ -9,10 +10,27 @@
 
     <!-- App Bridge -->
     <script src="https://unpkg.com/@shopify/app-bridge@3"></script>
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body>
-    <div class="Polaris-Page">
-        @yield('content')
+    <div class="Polaris-Page bg-gray-100 text-gray-900">
+        <div class="min-h-screen">
+            {{-- Navbar --}}
+            <header class="bg-white shadow">
+                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                    <h1 class="text-3xl font-bold text-gray-900">
+                        {{ config('app.name') }}
+                    </h1>
+                </div>
+            </header>
+
+            {{-- Main Content --}}
+            <main class="p-6">
+                @yield('content')
+            </main>
+        </div>
     </div>
 
     <script>
@@ -26,4 +44,5 @@
         });
     </script>
 </body>
+
 </html>

@@ -1,41 +1,23 @@
-@extends('layouts.shopify')
+@extends('layouts.app')
 
 @section('content')
-    <div class="Polaris-Layout">
-        <div class="Polaris-Layout__Section">
-            <div class="Polaris-Card">
-                <div class="Polaris-Card__Section">
-                    <h2 class="Polaris-Heading">ERP Integration Setup</h2>
-                    <p>Enter your ERP details below to connect with Shopify.</p>
-
-                    <form method="POST" action="{{ route('shopify.erp.save', $shop->id) }}">
-                        @csrf
-                        <div class="Polaris-FormLayout">
-
-                            <div class="Polaris-FormLayout__Item">
-                                <label class="Polaris-Label">ERP URL</label>
-                                <input class="Polaris-TextField__Input" type="url" name="erp_url"
-                                    value="{{ old('erp_url', $shop->erpIntegration->erp_url ?? '') }}"
-                                    placeholder="https://erp.example.com" required>
-                            </div>
-
-                            <div class="Polaris-FormLayout__Item">
-                                <label class="Polaris-Label">ERP API Token</label>
-                                <input class="Polaris-TextField__Input" type="password" name="erp_secret"
-                                    value="{{ old('erp_secret', $shop->erpIntegration->erp_secret ?? '') }}" required>
-                            </div>
-
-                            <div class="Polaris-FormLayout__Item">
-                                <button type="submit" class="Polaris-Button Polaris-Button--primary">
-                                    Save ERP Settings
-                                </button>
-                            </div>
-
-                        </div>
-                    </form>
-
-                </div>
+    <div class="max-w-lg mx-auto bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-bold mb-4">ERP Integration Setup</h2>
+        <form action="{{ route('shopify.erp.save') }}" method="POST">
+            @csrf
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700">ERP URL</label>
+                <input type="text" name="erp_url" placeholder="https://erp.example.com"
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
             </div>
-        </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700">ERP API Token</label>
+                <input type="text" name="erp_token"
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                Save ERP Settings
+            </button>
+        </form>
     </div>
 @endsection
