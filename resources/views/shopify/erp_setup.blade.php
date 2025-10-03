@@ -21,7 +21,7 @@
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
                 </div>
-                
+
                 {{-- ERP URL --}}
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">ERP URL</label>
@@ -42,6 +42,14 @@
                     @error('erp_secret')
                         <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                     @enderror
+                </div>
+
+                {{-- SECRET TOKEN --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Secret Token</label>
+                    <input type="text" name="erp_secret" readonly value="{{ $shop->erp_secret }}"
+                        class="block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="text-gray-300 text-sm mt-1 italic">Use this token to secure your connection with Shopify</p>
                 </div>
 
                 {{-- Save Button --}}
