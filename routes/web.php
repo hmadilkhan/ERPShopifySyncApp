@@ -6,6 +6,7 @@ use App\Services\ShopifyService;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 // Route::get('/', function () {
 //     return view('welcome');
@@ -59,6 +60,8 @@ Route::get('/shopify/callback', function (Request $request) {
     ])->get("https://{$shop}/admin/api/2025-01/shop.json")
         ->json()['shop'];
 
+    $erp_secret = Str::random(40);
+    
     // 3. Save shop + token + shop info in DB
     $shopModel =  ShopifyShop::updateOrCreate(
         ['shop_domain' => $shop], // unique
@@ -70,6 +73,7 @@ Route::get('/shopify/callback', function (Request $request) {
             'currency'     => $shopInfo['currency'] ?? null,
             'timezone'     => $shopInfo['iana_timezone'] ?? null,
             'is_active'    => true,
+            'erp_secret'   => $erp_secret ?? null,
         ]
     );
 
