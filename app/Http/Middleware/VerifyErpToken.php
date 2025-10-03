@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ShopifyShop;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,7 +14,7 @@ class VerifyErpToken
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
         $authorization = $request->header('Authorization');
 
@@ -23,9 +24,15 @@ class VerifyErpToken
 
         $token = $matches[1];
 
-        if ($token !== config('services.erp.secret')) {
+        // 🔎 Check token in database
+        $shop = ShopifyShop::where('erp_secret', $token)->first();
+
+        if (!$shop) {
             return response()->json(['error' => 'Unauthorized ERP request'], 401);
         }
+
+        // ✅ You can also share the shop with controllers if needed
+        $request->attributes->set('shop', $shop);
 
         return $next($request);
     }
