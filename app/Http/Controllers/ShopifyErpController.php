@@ -17,15 +17,17 @@ class ShopifyErpController extends Controller
     public function save(Request $request, $shopId)
     {
         $request->validate([
+            'name' => 'required|string',
             'erp_url' => 'required|url',
             'erp_secret' => 'required|string',
         ]);
-        \Log::info($shopId);
+     
         $shop = ShopifyShop::findOrFail($shopId);
 
         $shop->erpIntegration()->updateOrCreate(
             ['shop_id' => $shop->id],
             [
+                'name' => $request->name,
                 'erp_url' => $request->erp_url,
                 'erp_secret' => $request->erp_secret, // will be encrypted by model cast
             ]

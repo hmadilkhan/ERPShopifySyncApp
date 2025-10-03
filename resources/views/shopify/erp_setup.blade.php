@@ -11,6 +11,17 @@
             <form action="{{ route('shopify.erp.save', $shop->id) }}" method="POST" class="space-y-6">
                 @csrf
 
+                {{-- ERP Name --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ERP Name</label>
+                    <input type="text" name="name" placeholder="https://erp.example.com"
+                        value="{{ old('name', $shop->erpIntegration->name ?? '') }}"
+                        class="block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-indigo-500 focus:border-indigo-500">
+                    @error('name')
+                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+                
                 {{-- ERP URL --}}
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">ERP URL</label>
