@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.shopify')
 
 @section('content')
     <div class="max-w-2xl mx-auto">
