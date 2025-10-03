@@ -28,7 +28,7 @@ class VerifyErpToken
         $shop = ShopifyShop::where('erp_secret', $token)->first();
 
         if (!$shop) {
-            return response()->json(['error' => 'Unauthorized ERP request'], 401);
+            return response()->json(['error' => 'Unauthorized ERP request'.$token], 401);
         }
 
         // ✅ You can also share the shop with controllers if needed
