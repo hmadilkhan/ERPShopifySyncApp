@@ -38,7 +38,7 @@
         var createApp = AppBridge.createApp;
 
         var app = createApp({
-            apiKey: "{{ config('services.shopify.api_key') }}",
+            apiKey: "{{ config('shopify.api_key') }}",
             shopOrigin: "{{ $shop->shop_domain ?? request('shop') }}",
             forceRedirect: true, // 🔑 This ensures app always runs in Admin iframe
         });
