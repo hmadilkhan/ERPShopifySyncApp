@@ -14,12 +14,17 @@ class ShopifyShop extends Model
         'email',
         'currency',
         'timezone',
-        'is_active',    
+        'is_active',
         'erp_integration_id',
     ];
 
+    // public function erpIntegration()
+    // {
+    //     return $this->belongsTo(ErpIntegration::class);
+    // }
+
     public function erpIntegration()
     {
-        return $this->belongsTo(ErpIntegration::class);
+        return $this->hasOne(ErpIntegration::class, 'shop_id');
     }
 }

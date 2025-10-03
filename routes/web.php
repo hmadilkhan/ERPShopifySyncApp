@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ShopifyErpController;
 use App\Models\ShopifyShop;
 use App\Services\ShopifyService;
 use Illuminate\Support\Facades\Route;
@@ -46,7 +47,7 @@ Route::get('/shopify/callback', function (Request $request) {
         ->json()['shop'];
 
     // 3. Save shop + token + shop info in DB
-    ShopifyShop::updateOrCreate(
+    $shopModel =  ShopifyShop::updateOrCreate(
         ['shop_domain' => $shop], // unique
         [
             'access_token' => $token,
@@ -64,7 +65,9 @@ Route::get('/shopify/callback', function (Request $request) {
     registerShopifyWebhook($shop, $token, 'inventory_levels/update', '/shopify/webhook/inventory');
     registerShopifyWebhook($shop, $token, 'orders/updated', '/shopify/webhook/order-updated');
 
-    return "✅ Shopify app installed successfully for {$shop}";
+    // ✅ Redirect merchant to ERP Setup Page inside Shopify Admin
+    return redirect()->route('shopify.erp.show', $shopModel->id);
+    // return "✅ Shopify app installed successfully for {$shop}";
 });
 
 
@@ -134,4 +137,10 @@ Route::get('/shopify/create-product', function () {
     ])->post("https://{$shop->shop_domain}/admin/api/2025-01/products.json", $payload);
 
     return $response->json();
+});
+
+
+Route::prefix('shopify')->group(function () {
+    Route::get('/erp/{shopId}', [ShopifyErpController::class, 'show'])->name('shopify.erp.show');
+    Route::post('/erp/{shopId}', [ShopifyErpController::class, 'save'])->name('shopify.erp.save');
 });
