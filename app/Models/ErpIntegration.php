@@ -18,6 +18,11 @@ class ErpIntegration extends Model
         return $this->hasMany(ShopifyShop::class);
     }
 
+    public function shop()
+    {
+        return $this->belongsTo(ShopifyShop::class, 'shop_id');
+    }
+
     protected $casts = [
         'erp_secret' => 'encrypted', // Laravel will encrypt/decrypt automatically
     ];
