@@ -15,7 +15,7 @@ class ShopifyShop extends Model
         'currency',
         'timezone',
         'is_active',
-        'erp_integration_id',
+        'erp_secret',
     ];
 
     // public function erpIntegration()
