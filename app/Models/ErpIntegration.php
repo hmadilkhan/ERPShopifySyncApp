@@ -13,11 +13,6 @@ class ErpIntegration extends Model
         'is_active',
     ];
 
-    public function shops()
-    {
-        return $this->hasMany(ShopifyShop::class);
-    }
-
     public function shop()
     {
         return $this->belongsTo(ShopifyShop::class, 'shop_id');
