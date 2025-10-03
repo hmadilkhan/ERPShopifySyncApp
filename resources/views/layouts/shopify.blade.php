@@ -15,12 +15,12 @@
 </head>
 
 <body>
-    <div class="Polaris-Page bg-gray-100 text-gray-900">
+    <div class="Polaris-Page bg-gray-50 text-gray-900 font-sans">
         <div class="min-h-screen">
             {{-- Navbar --}}
-            <header class="bg-white shadow">
-                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                    <h1 class="text-3xl font-bold text-gray-900">
+            <header class="bg-white border-b shadow-sm">
+                <div class="max-w-7xl mx-auto py-4 px-6 flex justify-between items-center">
+                    <h1 class="text-lg font-semibold text-gray-800">
                         {{ config('app.name') }}
                     </h1>
                 </div>
