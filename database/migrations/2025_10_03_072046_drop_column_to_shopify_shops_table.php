@@ -22,7 +22,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('shopify_shops', function (Blueprint $table) {
-            $table->foreignId('erp_integration_id')->nullable()->constrained('erp_integrations')->onDelete('cascade');
+            $table->dropForeign(['erp_integration_id']);
+            $table->dropColumn('erp_integration_id');
         });
     }
 };
