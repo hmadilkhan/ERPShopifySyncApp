@@ -153,7 +153,7 @@ Route::get('/shopify/create-product', function () {
 });
 
 
-Route::prefix('shopify')->group(function () {
+Route::prefix('shopify')->middleware(['web'])->group(function () {
     Route::get('/erp/{shopId}', [ShopifyErpController::class, 'show'])->name('shopify.erp.show');
     Route::post('/erp/{shopId}', [ShopifyErpController::class, 'save'])->name('shopify.erp.save');
 });

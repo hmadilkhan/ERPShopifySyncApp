@@ -20,7 +20,7 @@ class ShopifyErpController extends Controller
             'erp_url' => 'required|url',
             'erp_secret' => 'required|string',
         ]);
-
+        \Log::info($shopId);
         $shop = ShopifyShop::findOrFail($shopId);
 
         $shop->erpIntegration()->updateOrCreate(
