@@ -24,10 +24,27 @@ class ShopifyWebhookService
             ])->post("https://{$shop->shop_domain}/admin/api/2025-01/webhooks.json", [
                 "webhook" => [
                     "topic" => $topic,
-                    "address" => config('app.url') . "/webhooks/shopify/{$topic}",
+                    "address" => config('app.url') . "/api/webhooks/shopify/{$topic}",
                     "format" => "json",
                 ]
             ]);
         }
+    }
+
+    public static function deleteAll(ShopifyShop $shop)
+    {
+        $response = Http::withHeaders([
+            'X-Shopify-Access-Token' => $shop->access_token,
+        ])->get("https://{$shop->shop_domain}/admin/api/2025-01/webhooks.json");
+
+        $webhooks = $response->json()['webhooks'] ?? [];
+
+        foreach ($webhooks as $webhook) {
+            Http::withHeaders([
+                'X-Shopify-Access-Token' => $shop->access_token,
+            ])->delete("https://{$shop->shop_domain}/admin/api/2025-01/webhooks/{$webhook['id']}.json");
+        }
+
+        return count($webhooks);
     }
 }

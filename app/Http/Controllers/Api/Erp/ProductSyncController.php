@@ -20,6 +20,9 @@ class ProductSyncController extends Controller
                 "title" => $data['title'],
                 "body_html" => $data['description'] ?? '',
                 "vendor" => $data['vendor'] ?? 'ERP',
+                "price" => $data['price'],
+                "currency" => $data['currency'],
+                "stock" => $data['stock'],
                 "product_type" => $data['product_type'] ?? '',
                 "status" => $data['status'],
                 "variants" => collect($data['variants'] ?? [])->map(function ($variant) {
@@ -45,6 +48,7 @@ class ProductSyncController extends Controller
             ShopifyProduct::updateOrCreate(
                 ['sku' => $data['sku'], 'shop_id' => $shop->id],
                 [
+                    'erp_product_id' => $data['id'],
                     'shopify_product_id' => $result['product']['id'],
                     'shopify_variant_id' => $result['product']['variants'][0]['id'] ?? null,
                     'inventory_item_id' => $result['product']['variants'][0]['inventory_item_id'] ?? null,

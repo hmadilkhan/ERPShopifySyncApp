@@ -3,6 +3,7 @@
 use App\Http\Controllers\ShopifyErpController;
 use App\Models\ShopifyShop;
 use App\Services\ShopifyService;
+use App\Services\ShopifyWebhookService;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -61,7 +62,7 @@ Route::get('/shopify/callback', function (Request $request) {
         ->json()['shop'];
 
     $erp_secret = Str::random(40);
-    
+
     // 3. Save shop + token + shop info in DB
     $shopModel =  ShopifyShop::updateOrCreate(
         ['shop_domain' => $shop], // unique
@@ -82,6 +83,8 @@ Route::get('/shopify/callback', function (Request $request) {
     registerShopifyWebhook($shop, $token, 'inventory_levels/update', '/shopify/webhook/inventory');
     registerShopifyWebhook($shop, $token, 'orders/updated', '/shopify/webhook/order-updated');
 
+    ShopifyWebhookService::register($shopModel);
+
     // ✅ Redirect merchant to ERP Setup Page inside Shopify Admin
     return redirect()->route('shopify.erp.show', $shopModel->id);
     // return "✅ Shopify app installed successfully for {$shop}";
@@ -96,6 +99,15 @@ Route::get('/shopify/test-webhook', function () {
         'orders/create',
         '/shopify/webhook/orders'
     );
+});
+
+Route::get('/shopify/register-webhook', function () {
+    $shop = ShopifyShop::first(); // get your saved shop
+    return ShopifyWebhookService::register($shop);
+});
+Route::get('/shopify/delete-webhook', function () {
+    $shop = ShopifyShop::first(); // get your saved shop
+    return ShopifyWebhookService::deleteAll($shop);
 });
 
 Route::get('/shopify/list-webhooks', function () {
