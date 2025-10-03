@@ -15,7 +15,7 @@
 </head>
 
 <body>
-    <div class="Polaris-Page bg-gray-50 text-gray-900 font-sans">
+    <div class="Polaris-Page bg-gray-80 text-gray-900 font-sans">
         <div class="min-h-screen">
             {{-- Navbar --}}
             <header class="bg-white border-b shadow-sm">
