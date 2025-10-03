@@ -7,8 +7,21 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
+// Route::get('/', function () {
+//     return view('welcome');
+// });
+
 Route::get('/', function () {
-    return view('welcome');
+    $shop = request()->query('shop');
+
+    if ($shop) {
+        $shopModel = \App\Models\ShopifyShop::where('shop_domain', $shop)->first();
+        if ($shopModel) {
+            return redirect()->route('shopify.erp.show', $shopModel->id);
+        }
+    }
+
+    return view('welcome'); // fallback if accessed directly
 });
 
 
