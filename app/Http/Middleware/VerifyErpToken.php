@@ -15,10 +15,18 @@ class VerifyErpToken
      */
     public function handle(Request $request, Closure $next)
     {
-        $token = $request->header('X-ERP-TOKEN');
+        $authorization = $request->header('Authorization');
+
+        if (!$authorization || !preg_match('/Bearer\s+(\S+)/', $authorization, $matches)) {
+            return response()->json(['error' => 'Missing or invalid token'], 401);
+        }
+
+        $token = $matches[1];
+
         if ($token !== config('services.erp.secret')) {
             return response()->json(['error' => 'Unauthorized ERP request'], 401);
         }
+
         return $next($request);
     }
 }
