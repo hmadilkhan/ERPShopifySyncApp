@@ -105,6 +105,11 @@ Route::get('/shopify/register-webhook', function () {
     $shop = ShopifyShop::first(); // get your saved shop
     return ShopifyWebhookService::register($shop);
 });
+
+Route::get('/shopify/get-all-webhook', function () {
+    $shop = ShopifyShop::first(); // get your saved shop
+    return ShopifyWebhookService::getAll($shop);
+});
 Route::get('/shopify/delete-webhook', function () {
     $shop = ShopifyShop::first(); // get your saved shop
     return ShopifyWebhookService::deleteAll($shop);

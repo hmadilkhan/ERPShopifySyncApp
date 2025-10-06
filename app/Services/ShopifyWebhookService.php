@@ -37,6 +37,28 @@ class ShopifyWebhookService
         }
     }
 
+    /**
+     * ✅ Get all registered webhooks for a given shop
+     */
+    public static function getAll(ShopifyShop $shop)
+    {
+        $response = Http::withHeaders([
+            'X-Shopify-Access-Token' => $shop->access_token,
+        ])->get("https://{$shop->shop_domain}/admin/api/2025-01/webhooks.json");
+
+        if ($response->successful()) {
+            return $response->json('webhooks'); // returns array of all webhooks
+        }
+
+        \Log::error('Failed to fetch Shopify webhooks', [
+            'shop' => $shop->shop_domain,
+            'status' => $response->status(),
+            'body' => $response->body(),
+        ]);
+
+        return [];
+    }
+
     public static function deleteAll(ShopifyShop $shop)
     {
         $response = Http::withHeaders([
