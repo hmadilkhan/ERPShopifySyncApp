@@ -9,7 +9,6 @@ class ShopifyWebhookService
 {
     public static function register(ShopifyShop $shop)
     {
-        return config('app.url');
         $topics = [
             'orders/create',
             'orders/updated',
