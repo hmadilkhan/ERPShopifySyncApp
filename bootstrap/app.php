@@ -16,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'auth.erp' => VerifyErpToken::class,
-            'verify.shopify' => VerifyShopifyWebhook::class,
+            'verify.shopify.webhook' => VerifyShopifyWebhook::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
