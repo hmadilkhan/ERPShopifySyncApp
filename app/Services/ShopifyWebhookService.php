@@ -19,7 +19,7 @@ class ShopifyWebhookService
         ];
 
         foreach ($topics as $topic) {
-            Http::withHeaders([
+            $response = Http::withHeaders([
                 'X-Shopify-Access-Token' => $shop->access_token,
             ])->post("https://{$shop->shop_domain}/admin/api/2025-01/webhooks.json", [
                 "webhook" => [
@@ -27,6 +27,12 @@ class ShopifyWebhookService
                     "address" => config('app.url') . "/api/webhooks/shopify/{$topic}",
                     "format" => "json",
                 ]
+            ]);
+
+            dd([
+                'shop' => $shop->shop_domain,
+                'status' => $response->status(),
+                'body' => $response->json(),
             ]);
         }
     }
