@@ -173,6 +173,8 @@ class ShopifyWebhookController extends Controller
 
             \Log::info('♻️ Shopify Product Updated Webhook', ['payload' => $data]);
 
+            $shopId = $this->getShopId($request);
+
             $product = ShopifyProduct::updateOrCreate(
                 ['shopify_product_id' => $data['id']],
                 [
@@ -180,6 +182,7 @@ class ShopifyWebhookController extends Controller
                     'status'    => $data['status'] ?? 'active',
                     'price'     => $data['variants'][0]['price'] ?? 0,
                     'stock'     => $data['variants'][0]['inventory_quantity'] ?? 0,
+                    'shop_id'   => $shopId,
                     'synced_at' => now(),
                 ]
             );
