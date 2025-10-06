@@ -13,57 +13,74 @@ class ShopifyWebhookController extends Controller
 {
     public function orderCreated(Request $request)
     {
-        $data = $request->all();
+        try {
+            $data = $request->all();
 
-        // Save in SYNC DB
-        $order = ShopifyOrder::updateOrCreate(
-            ['shopify_order_id' => $data['id']],
-            [
-                'shop_id'            => $this->getShopId($request),
-                'name'               => $data['name'] ?? null,
-                'status'             => $data['cancelled_at'] ? 'cancelled' : 'open',
-                'financial_status'   => $data['financial_status'] ?? null,
-                'fulfillment_status' => $data['fulfillment_status'] ?? null,
-                'total_price'        => $data['total_price'] ?? 0,
-                'currency'           => $data['currency'] ?? 'USD',
-                'raw_payload'        => $data,
-                'synced_at'          => now(),
-            ]
-        );
+            \Log::info('📦 Incoming Shopify Order Created Webhook', [
+                'headers' => $request->headers->all(),
+                'payload' => $data,
+            ]);
 
-        // Transform to ERP contract
-        $payload = [
-            "order_id"           => $data['id'],
-            "name"               => $data['name'],
-            "status"             => $order->status,
-            "financial_status"   => $order->financial_status,
-            "fulfillment_status" => $order->fulfillment_status,
-            "currency"           => $order->currency,
-            "total_price"        => $order->total_price,
-            "line_items"         => collect($data['line_items'])->map(fn($item) => [
-                "product_id" => $item['product_id'],
-                "sku"        => $item['sku'] ?? null,
-                "title"      => $item['title'],
-                "quantity"   => $item['quantity'],
-                "price"      => $item['price'],
-            ])->toArray(),
-            "customer" => [
-                "first_name" => $data['customer']['first_name'] ?? null,
-                "last_name"  => $data['customer']['last_name'] ?? null,
-                "email"      => $data['customer']['email'] ?? null,
-                "phone"      => $data['customer']['phone'] ?? null,
-            ],
-            "shop" => [
-                "domain"  => $request->header('X-Shopify-Shop-Domain'),
-                "shop_id" => $order->shop_id,
-            ],
-            "synced_at" => now()->toISOString(),
-        ];
+            // Save in SYNC DB
+            $order = ShopifyOrder::updateOrCreate(
+                ['shopify_order_id' => $data['id']],
+                [
+                    'shop_id'            => $this->getShopId($request),
+                    'name'               => $data['name'] ?? null,
+                    'status'             => $data['cancelled_at'] ? 'cancelled' : 'open',
+                    'financial_status'   => $data['financial_status'] ?? null,
+                    'fulfillment_status' => $data['fulfillment_status'] ?? null,
+                    'total_price'        => $data['total_price'] ?? 0,
+                    'currency'           => $data['currency'] ?? 'USD',
+                    'raw_payload'        => $data,
+                    'synced_at'          => now(),
+                ]
+            );
 
-        // Forward to ERP
-        $this->forwardToErp($request, '/webhooks/order-created', $payload);
+            // Transform to ERP contract
+            $payload = [
+                "order_id"           => $data['id'],
+                "name"               => $data['name'],
+                "status"             => $order->status,
+                "financial_status"   => $order->financial_status,
+                "fulfillment_status" => $order->fulfillment_status,
+                "currency"           => $order->currency,
+                "total_price"        => $order->total_price,
+                "line_items"         => collect($data['line_items'])->map(fn($item) => [
+                    "product_id" => $item['product_id'],
+                    "sku"        => $item['sku'] ?? null,
+                    "title"      => $item['title'],
+                    "quantity"   => $item['quantity'],
+                    "price"      => $item['price'],
+                ])->toArray(),
+                "customer" => [
+                    "first_name" => $data['customer']['first_name'] ?? null,
+                    "last_name"  => $data['customer']['last_name'] ?? null,
+                    "email"      => $data['customer']['email'] ?? null,
+                    "phone"      => $data['customer']['phone'] ?? null,
+                ],
+                "shop" => [
+                    "domain"  => $request->header('X-Shopify-Shop-Domain'),
+                    "shop_id" => $order->shop_id,
+                ],
+                "synced_at" => now()->toISOString(),
+            ];
 
-        return response()->json(['success' => true]);
+            // Forward to ERP
+            $this->forwardToErp($request, '/webhooks/order-created', $payload);
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $th) {
+            // 🔹 Log the error with detailed trace
+            \Log::error('❌ Shopify Order Created Webhook Failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'payload' => $request->all(),
+            ]);
+
+            // (Optional) Return 500 so Shopify retries
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
     }
 
     public function productCreated(Request $request)
