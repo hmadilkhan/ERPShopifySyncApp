@@ -16,11 +16,6 @@ class ShopifyWebhookController extends Controller
         try {
             $data = $request->all();
 
-            \Log::info('📦 Incoming Shopify Order Created Webhook', [
-                'headers' => $request->headers->all(),
-                'payload' => $data,
-            ]);
-
             // Save in SYNC DB
             $order = ShopifyOrder::updateOrCreate(
                 ['shopify_order_id' => $data['id']],
@@ -73,12 +68,55 @@ class ShopifyWebhookController extends Controller
         } catch (\Throwable $th) {
             // 🔹 Log the error with detailed trace
             \Log::error('❌ Shopify Order Created Webhook Failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error' => $th->getMessage(),
+                'trace' => $th->getTraceAsString(),
                 'payload' => $request->all(),
             ]);
 
             // (Optional) Return 500 so Shopify retries
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
+    }
+
+    /**
+     * Handle Order Updated Webhook
+     */
+    public function orderUpdated(Request $request)
+    {
+        try {
+            $data = $request->all();
+
+            \Log::info('♻️ Shopify Order Updated Webhook', [
+                'payload' => $data,
+            ]);
+
+            $order = ShopifyOrder::updateOrCreate(
+                ['shopify_order_id' => $data['id']],
+                [
+                    'shop_id'            => $this->getShopId($request),
+                    'name'               => $data['name'] ?? null,
+                    'status'             => $data['cancelled_at'] ? 'cancelled' : 'open',
+                    'financial_status'   => $data['financial_status'] ?? null,
+                    'fulfillment_status' => $data['fulfillment_status'] ?? null,
+                    'total_price'        => $data['total_price'] ?? 0,
+                    'currency'           => $data['currency'] ?? 'USD',
+                    'raw_payload'        => json_encode($data),
+                    'synced_at'          => now(),
+                ]
+            );
+
+            $this->forwardToErp($request, '/webhooks/order-updated', [
+                'order_id' => $data['id'],
+                'status'   => $order->status,
+                'updated_at' => now()->toISOString(),
+            ]);
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $th) {
+            \Log::error('❌ Shopify Order Updated Webhook Failed', [
+                'error'   => $th->getMessage(),
+                'payload' => $request->all(),
+            ]);
             return response()->json(['error' => 'Webhook processing failed'], 500);
         }
     }
@@ -123,6 +161,103 @@ class ShopifyWebhookController extends Controller
         $this->forwardToErp($request, '/webhooks/product-created', $payload);
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Handle Product Updated Webhook
+     */
+    public function productUpdated(Request $request)
+    {
+        try {
+            $data = $request->all();
+
+            \Log::info('♻️ Shopify Product Updated Webhook', ['payload' => $data]);
+
+            $product = ShopifyProduct::updateOrCreate(
+                ['shopify_product_id' => $data['id']],
+                [
+                    'title'     => $data['title'] ?? null,
+                    'status'    => $data['status'] ?? 'active',
+                    'price'     => $data['variants'][0]['price'] ?? 0,
+                    'stock'     => $data['variants'][0]['inventory_quantity'] ?? 0,
+                    'synced_at' => now(),
+                ]
+            );
+
+            $this->forwardToErp($request, '/webhooks/product-updated', [
+                'product_id' => $product->shopify_product_id,
+                'status'     => $product->status,
+                'price'      => $product->price,
+                'stock'      => $product->stock,
+                'synced_at'  => now()->toISOString(),
+            ]);
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $th) {
+            \Log::error('❌ Shopify Product Updated Webhook Failed', [
+                'error'   => $th->getMessage(),
+                'payload' => $request->all(),
+            ]);
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
+    }
+
+    /**
+     * Handle Product Deleted Webhook
+     */
+    public function productDeleted(Request $request)
+    {
+        try {
+            $data = $request->all();
+
+            \Log::info('🗑️ Shopify Product Deleted Webhook', ['payload' => $data]);
+
+            ShopifyProduct::where('shopify_product_id', $data['id'])->delete();
+
+            $this->forwardToErp($request, '/webhooks/product-deleted', [
+                'product_id' => $data['id'],
+                'deleted_at' => now()->toISOString(),
+            ]);
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $th) {
+            \Log::error('❌ Shopify Product Deleted Webhook Failed', [
+                'error'   => $th->getMessage(),
+                'payload' => $request->all(),
+            ]);
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
+    }
+
+    /**
+     * Handle Inventory Level Updated Webhook
+     */
+    public function inventoryUpdated(Request $request)
+    {
+        try {
+            $data = $request->all();
+
+            \Log::info('📦 Shopify Inventory Updated Webhook', ['payload' => $data]);
+
+            if (isset($data['inventory_item_id'])) {
+                ShopifyProduct::where('inventory_item_id', $data['inventory_item_id'])
+                    ->update(['stock' => $data['available'] ?? 0]);
+            }
+
+            $this->forwardToErp($request, '/webhooks/inventory-updated', [
+                'inventory_item_id' => $data['inventory_item_id'] ?? null,
+                'available'         => $data['available'] ?? 0,
+                'synced_at'         => now()->toISOString(),
+            ]);
+
+            return response()->json(['success' => true]);
+        } catch (\Throwable $th) {
+            \Log::error('❌ Shopify Inventory Updated Webhook Failed', [
+                'error'   => $th->getMessage(),
+                'payload' => $request->all(),
+            ]);
+            return response()->json(['error' => 'Webhook processing failed'], 500);
+        }
     }
 
     private function getShopId(Request $request)
