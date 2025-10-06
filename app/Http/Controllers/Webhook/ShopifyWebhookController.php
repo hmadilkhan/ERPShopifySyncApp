@@ -13,7 +13,6 @@ class ShopifyWebhookController extends Controller
 {
     public function orderCreated(Request $request)
     {
-        return 1;
         $data = $request->all();
 
         // Save in SYNC DB
