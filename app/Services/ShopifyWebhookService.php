@@ -28,12 +28,6 @@ class ShopifyWebhookService
                     "format" => "json",
                 ]
             ]);
-
-            dd([
-                'shop' => $shop->shop_domain,
-                'status' => $response->status(),
-                'body' => $response->json(),
-            ]);
         }
     }
 
