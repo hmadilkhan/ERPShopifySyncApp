@@ -35,33 +35,35 @@ class ShopifyWebhookController extends Controller
             );
 
             // Transform to ERP contract
-            $payload = [
-                "order_id"           => $data['id'],
-                "name"               => $data['name'],
-                "status"             => $order->status,
-                "financial_status"   => $order->financial_status,
-                "fulfillment_status" => $order->fulfillment_status,
-                "currency"           => $order->currency,
-                "total_price"        => $order->total_price,
-                "line_items"         => collect($data['line_items'])->map(fn($item) => [
-                    "product_id" => $item['product_id'],
-                    "sku"        => $item['sku'] ?? null,
-                    "title"      => $item['title'],
-                    "quantity"   => $item['quantity'],
-                    "price"      => $item['price'],
-                ])->toArray(),
-                "customer" => [
-                    "first_name" => $data['customer']['first_name'] ?? null,
-                    "last_name"  => $data['customer']['last_name'] ?? null,
-                    "email"      => $data['customer']['email'] ?? null,
-                    "phone"      => $data['customer']['phone'] ?? null,
-                ],
-                "shop" => [
-                    "domain"  => $request->header('X-Shopify-Shop-Domain'),
-                    "shop_id" => $order->shop_id,
-                ],
-                "synced_at" => now()->toISOString(),
-            ];
+            // $payload = [
+            //     "order_id"           => $data['id'],
+            //     "name"               => $data['name'],
+            //     "status"             => $order->status,
+            //     "financial_status"   => $order->financial_status,
+            //     "fulfillment_status" => $order->fulfillment_status,
+            //     "currency"           => $order->currency,
+            //     "total_price"        => $order->total_price,
+            //     "line_items"         => collect($data['line_items'])->map(fn($item) => [
+            //         "product_id" => $item['product_id'],
+            //         "sku"        => $item['sku'] ?? null,
+            //         "title"      => $item['title'],
+            //         "quantity"   => $item['quantity'],
+            //         "price"      => $item['price'],
+            //     ])->toArray(),
+            //     "customer" => [
+            //         "first_name" => $data['customer']['first_name'] ?? null,
+            //         "last_name"  => $data['customer']['last_name'] ?? null,
+            //         "email"      => $data['customer']['email'] ?? null,
+            //         "phone"      => $data['customer']['phone'] ?? null,
+            //     ],
+            //     "shop" => [
+            //         "domain"  => $request->header('X-Shopify-Shop-Domain'),
+            //         "shop_id" => $order->shop_id,
+            //     ],
+            //     "synced_at" => now()->toISOString(),
+            // ];
+
+            $payload = $this->transformToErpPayload($data,$request,$order);
 
             Log::info('🗑️ Shopify Product Payload', ['payload' => $payload]);
 
@@ -81,6 +83,55 @@ class ShopifyWebhookController extends Controller
             return response()->json(['error' => 'Webhook processing failed'], 500);
         }
     }
+
+    /**
+     * Transform Shopify webhook payload into ERP-ready format
+     */
+    protected function transformToErpPayload(array $data, Request $request, $order): array
+    {
+        return [
+            'order_id'           => $data['id'],
+            'name'               => $data['name'] ?? ('#' . ($data['order_number'] ?? 'N/A')),
+            'status'             => $order->status ?? ($data['cancelled_at'] ? 'cancelled' : 'open'),
+            'financial_status'   => $data['financial_status'] ?? 'pending',
+            'fulfillment_status' => $data['fulfillment_status'] ?? null,
+            'currency'           => $data['currency'] ?? 'PKR',
+            'total_price'        => $data['total_price'] ?? 0,
+
+            // 🧾 Line Items Mapping
+            'line_items' => collect($data['line_items'] ?? [])->map(function ($item) {
+                return [
+                    'product_id' => $item['product_id'] ?? null,
+                    'sku'        => $item['sku'] ?? null,
+                    'title'      => $item['title'] ?? null,
+                    'quantity'   => $item['quantity'] ?? 0,
+                    'price'      => $item['price'] ?? 0,
+                    'tax'        => collect($item['tax_lines'] ?? [])->sum('price') ?? 0,
+                ];
+            })->values()->toArray(),
+
+            // 👤 Customer Mapping
+            'customer' => [
+                'first_name' => $data['customer']['first_name'] ?? ($data['billing_address']['first_name'] ?? 'Guest'),
+                'last_name'  => $data['customer']['last_name'] ?? ($data['billing_address']['last_name'] ?? ''),
+                'email'      => $data['customer']['email'] ?? $data['email'] ?? null,
+                'phone'      => $data['customer']['phone'] ?? $data['billing_address']['phone'] ?? null,
+                'address'    => $data['billing_address']['address1'] ?? null,
+                'city'       => $data['billing_address']['city'] ?? null,
+                'country'    => $data['billing_address']['country'] ?? null,
+            ],
+
+            // 🏬 Shop / Website info
+            'shop' => [
+                'domain'  => $request->header('X-Shopify-Shop-Domain'),
+                'shop_id' => $order->shop_id ?? null,
+            ],
+
+            // 🕒 Metadata
+            'synced_at' => now()->toISOString(),
+        ];
+    }
+
 
     /**
      * Handle Order Updated Webhook
