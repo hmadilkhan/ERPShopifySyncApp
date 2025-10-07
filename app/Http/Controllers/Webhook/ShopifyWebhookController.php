@@ -63,7 +63,7 @@ class ShopifyWebhookController extends Controller
             //     "synced_at" => now()->toISOString(),
             // ];
 
-            $payload = $this->transformToErpPayload($data,$request,$order);
+            $payload = $this->transformToErpPayload($data, $request, $order);
 
             Log::info('🗑️ Shopify Product Payload', ['payload' => $payload]);
 
@@ -364,6 +364,22 @@ class ShopifyWebhookController extends Controller
                 'status' => $response->status(),
                 'body' => $response->json() ?? $response->body(),
             ]);
+
+            if ($response->successful()) {
+                $erpResponse = $response->json();
+                $receiptId = $erpResponse['receipt_id'] ?? null;
+
+                if ($receiptId) {
+                    ShopifyOrder::where('shopify_order_id', $payload['order_id'])
+                        ->update(['erp_order_id' => $receiptId]);
+                }
+
+                Log::info('ERP Sync Success', [
+                    'order_id' => $payload['order_id'],
+                    'erp_receipt_id' => $receiptId,
+                    'response' => $erpResponse
+                ]);
+            }
 
             if ($response->failed()) {
                 Log::error('🚨 [ERP Forwarding Failed]', [
