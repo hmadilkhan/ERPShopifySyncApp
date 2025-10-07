@@ -8,6 +8,8 @@ use App\Models\ShopifyProduct;
 use App\Models\ShopifyShop;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\FacadesLog;
 
 class ShopifyWebhookController extends Controller
 {
@@ -67,7 +69,7 @@ class ShopifyWebhookController extends Controller
             return response()->json(['success' => true]);
         } catch (\Throwable $th) {
             // 🔹 Log the error with detailed trace
-            \Log::error('❌ Shopify Order Created Webhook Failed', [
+            Log::error('❌ Shopify Order Created Webhook Failed', [
                 'error' => $th->getMessage(),
                 'trace' => $th->getTraceAsString(),
                 'payload' => $request->all(),
@@ -86,7 +88,7 @@ class ShopifyWebhookController extends Controller
         try {
             $data = $request->all();
 
-            \Log::info('♻️ Shopify Order Updated Webhook', [
+            Log::info('♻️ Shopify Order Updated Webhook', [
                 'payload' => $data,
             ]);
 
@@ -113,7 +115,7 @@ class ShopifyWebhookController extends Controller
 
             return response()->json(['success' => true]);
         } catch (\Throwable $th) {
-            \Log::error('❌ Shopify Order Updated Webhook Failed', [
+            Log::error('❌ Shopify Order Updated Webhook Failed', [
                 'error'   => $th->getMessage(),
                 'payload' => $request->all(),
             ]);
@@ -171,7 +173,7 @@ class ShopifyWebhookController extends Controller
         try {
             $data = $request->all();
 
-            \Log::info('♻️ Shopify Product Updated Webhook', ['payload' => $data]);
+            Log::info('♻️ Shopify Product Updated Webhook', ['payload' => $data]);
 
             $product = ShopifyProduct::updateOrCreate(
                 ['shopify_product_id' => $data['id']],
@@ -197,7 +199,7 @@ class ShopifyWebhookController extends Controller
 
             return response()->json(['success' => true]);
         } catch (\Throwable $th) {
-            \Log::error('❌ Shopify Product Updated Webhook Failed', [
+            Log::error('❌ Shopify Product Updated Webhook Failed', [
                 'error'   => $th->getMessage(),
                 'payload' => $request->all(),
             ]);
@@ -213,7 +215,7 @@ class ShopifyWebhookController extends Controller
         try {
             $data = $request->all();
 
-            \Log::info('🗑️ Shopify Product Deleted Webhook', ['payload' => $data]);
+            Log::info('🗑️ Shopify Product Deleted Webhook', ['payload' => $data]);
 
             ShopifyProduct::where('shopify_product_id', $data['id'])->delete();
 
@@ -224,7 +226,7 @@ class ShopifyWebhookController extends Controller
 
             return response()->json(['success' => true]);
         } catch (\Throwable $th) {
-            \Log::error('❌ Shopify Product Deleted Webhook Failed', [
+            Log::error('❌ Shopify Product Deleted Webhook Failed', [
                 'error'   => $th->getMessage(),
                 'payload' => $request->all(),
             ]);
@@ -240,7 +242,7 @@ class ShopifyWebhookController extends Controller
         try {
             $data = $request->all();
 
-            \Log::info('📦 Shopify Inventory Updated Webhook', ['payload' => $data]);
+            Log::info('📦 Shopify Inventory Updated Webhook', ['payload' => $data]);
 
             if (isset($data['inventory_item_id'])) {
                 ShopifyProduct::where('inventory_item_id', $data['inventory_item_id'])
@@ -255,7 +257,7 @@ class ShopifyWebhookController extends Controller
 
             return response()->json(['success' => true]);
         } catch (\Throwable $th) {
-            \Log::error('❌ Shopify Inventory Updated Webhook Failed', [
+            Log::error('❌ Shopify Inventory Updated Webhook Failed', [
                 'error'   => $th->getMessage(),
                 'payload' => $request->all(),
             ]);
@@ -271,12 +273,58 @@ class ShopifyWebhookController extends Controller
 
     private function forwardToErp(Request $request, string $endpoint, array $payload)
     {
-        $shopDomain = $request->header('X-Shopify-Shop-Domain');
-        $shop = ShopifyShop::where('shop_domain', $shopDomain)->first();
+        try {
 
-        if ($shop && $shop->erpIntegration) {
-            Http::withToken($shop->erpIntegration->erp_secret)
-                ->post($shop->erpIntegration->erp_url . $endpoint, $payload);
+            $shopDomain = $request->header('X-Shopify-Shop-Domain');
+            Log::info('🟦 [ERP Forwarding] Incoming shop domain', ['shop_domain' => $shopDomain]);
+            $shop = ShopifyShop::where('shop_domain', $shopDomain)->first();
+
+            if (!$shop) {
+                Log::warning('❌ [ERP Forwarding] No shop found in database for domain', [
+                    'shop_domain' => $shopDomain,
+                ]);
+                return;
+            }
+
+            if (!$shop->erpIntegration) {
+                Log::warning('⚠️ [ERP Forwarding] No ERP integration configured for shop', [
+                    'shop_id' => $shop->id,
+                ]);
+                return;
+            }
+
+            $erpUrl = rtrim($shop->erpIntegration->erp_url, '/') . $endpoint;
+            $erpToken = $shop->erpIntegration->erp_secret;
+
+            Log::info('➡️ [ERP Forwarding] Sending payload to ERP', [
+                'erp_url' => $erpUrl,
+                'endpoint' => $endpoint,
+                'payload_preview' => array_slice($payload, 0, 5), // limit log size
+            ]);
+
+            $response = Http::withToken($erpToken)
+                ->timeout(15)
+                ->acceptJson()
+                ->post($erpUrl, $payload);
+
+            Log::info('⬅️ [ERP Forwarding Response]', [
+                'status' => $response->status(),
+                'body' => $response->json() ?? $response->body(),
+            ]);
+
+            if ($response->failed()) {
+                Log::error('🚨 [ERP Forwarding Failed]', [
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('🔥 [ERP Forwarding Exception]', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 }
