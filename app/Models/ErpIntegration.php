@@ -19,6 +19,6 @@ class ErpIntegration extends Model
     }
 
     protected $casts = [
-        'erp_secret' => 'encrypted', // Laravel will encrypt/decrypt automatically
+        // 'erp_secret' => 'encrypted', // Laravel will encrypt/decrypt automatically
     ];
 }
