@@ -63,6 +63,8 @@ class ShopifyWebhookController extends Controller
                 "synced_at" => now()->toISOString(),
             ];
 
+            Log::info('🗑️ Shopify Product Payload', ['payload' => $payload]);
+
             // Forward to ERP
             $this->forwardToErp($request, '/webhooks/order-created', $payload);
 
