@@ -89,6 +89,29 @@ class ShopifyWebhookController extends Controller
      */
     protected function transformToErpPayload(array $data, Request $request, $order): array
     {
+        // 🧾 Collect all Shopify product IDs from line items
+        $shopifyIds = collect($data['line_items'] ?? [])
+            ->pluck('product_id')
+            ->filter()
+            ->unique();
+
+        // ⚡ Prefetch ERP product IDs for these Shopify IDs
+        $productMap = \App\Models\ShopifyProduct::whereIn('shopify_product_id', $shopifyIds)
+            ->pluck('erp_product_id', 'shopify_product_id')
+            ->toArray();
+
+        // 🔄 Transform line items with mapped ERP product IDs
+        $lineItems = collect($data['line_items'] ?? [])->map(function ($item) use ($productMap) {
+            return [
+                'product_id' => $productMap[$item['product_id']] ?? $item['product_id'] ?? null, // ERP ID fallback to Shopify ID
+                'sku'        => $item['sku'] ?? null,
+                'title'      => $item['title'] ?? null,
+                'quantity'   => $item['quantity'] ?? 0,
+                'price'      => $item['price'] ?? 0,
+                'tax'        => collect($item['tax_lines'] ?? [])->sum('price') ?? 0,
+            ];
+        })->values()->toArray();
+
         return [
             'order_id'           => $data['id'],
             'name'               => $data['name'] ?? ('#' . ($data['order_number'] ?? 'N/A')),
@@ -99,16 +122,20 @@ class ShopifyWebhookController extends Controller
             'total_price'        => $data['total_price'] ?? 0,
 
             // 🧾 Line Items Mapping
-            'line_items' => collect($data['line_items'] ?? [])->map(function ($item) {
-                return [
-                    'product_id' => $item['product_id'] ?? null,
-                    'sku'        => $item['sku'] ?? null,
-                    'title'      => $item['title'] ?? null,
-                    'quantity'   => $item['quantity'] ?? 0,
-                    'price'      => $item['price'] ?? 0,
-                    'tax'        => collect($item['tax_lines'] ?? [])->sum('price') ?? 0,
-                ];
-            })->values()->toArray(),
+            'line_items' => $lineItems,
+            // 'line_items' => collect($data['line_items'] ?? [])->map(function ($item) {
+            //     // Fetch ERP Product ID using Shopify Product ID
+            //     $erpProductId = ShopifyProduct::where('shopify_product_id', $item['product_id'] ?? null)
+            //         ->value('erp_product_id');
+            //     return [
+            //         'product_id' => $erpProductId ?? $item['product_id'] ?? null,
+            //         'sku'        => $item['sku'] ?? null,
+            //         'title'      => $item['title'] ?? null,
+            //         'quantity'   => $item['quantity'] ?? 0,
+            //         'price'      => $item['price'] ?? 0,
+            //         'tax'        => collect($item['tax_lines'] ?? [])->sum('price') ?? 0,
+            //     ];
+            // })->values()->toArray(),
 
             // 👤 Customer Mapping
             'customer' => [
@@ -128,7 +155,7 @@ class ShopifyWebhookController extends Controller
             ],
 
             // 🕒 Metadata
-            'synced_at' => now()->toISOString(),
+            // 'synced_at' => now()->toISOString(),
         ];
     }
 
@@ -371,7 +398,7 @@ class ShopifyWebhookController extends Controller
 
                 if ($receiptId) {
                     ShopifyOrder::where('shopify_order_id', $payload['order_id'])
-                        ->update(['erp_order_id' => $receiptId]);
+                        ->update(['erp_order_id' => $receiptId, 'synced_at' => now()->toISOString()]);
                 }
 
                 Log::info('ERP Sync Success', [
