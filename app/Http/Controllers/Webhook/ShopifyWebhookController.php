@@ -30,7 +30,7 @@ class ShopifyWebhookController extends Controller
                     'total_price'        => $data['total_price'] ?? 0,
                     'currency'           => $data['currency'] ?? 'USD',
                     'raw_payload'        => $data,
-                    'synced_at'          => now(),
+                    // 'synced_at'          => now(),
                 ]
             );
 
@@ -183,7 +183,7 @@ class ShopifyWebhookController extends Controller
                     'total_price'        => $data['total_price'] ?? 0,
                     'currency'           => $data['currency'] ?? 'USD',
                     'raw_payload'        => json_encode($data),
-                    'synced_at'          => now(),
+                    // 'synced_at'          => now(),
                 ]
             );
 
@@ -398,7 +398,7 @@ class ShopifyWebhookController extends Controller
 
                 if ($receiptId) {
                     ShopifyOrder::where('shopify_order_id', $payload['order_id'])
-                        ->update(['erp_order_id' => $receiptId, 'synced_at' => now()->toISOString()]);
+                        ->update(['erp_order_id' => $receiptId, 'synced_at' => now()]);
                 }
 
                 Log::info('ERP Sync Success', [
