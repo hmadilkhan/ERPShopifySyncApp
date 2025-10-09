@@ -65,13 +65,11 @@ class OrderSyncController extends Controller
                 return response()->json(['error' => 'Shop not found for this order'], 404);
             }
 
-            // ✅ Step 4: Map ERP status → Shopify fulfillment or cancel logic
-            $status       = strtolower($data['status']);
-            $orderId      = $shopOrder->shopify_order_id;
-            $shopDomain   = $shop->shop_domain;
-            $accessToken  = $shop->access_token;
+            $status      = strtolower($data['status']);
+            $orderId     = $shopOrder->shopify_order_id;
+            $shopDomain  = $shop->shop_domain;
+            $accessToken = $shop->access_token;
 
-            // Base headers
             $headers = [
                 'X-Shopify-Access-Token' => $accessToken,
                 'Accept' => 'application/json',
@@ -83,14 +81,38 @@ class OrderSyncController extends Controller
                 case 'fulfilled':
                 case 'delivered':
                 case 'shipped':
-                    // ✅ Fulfill the order (mark as fulfilled)
+                    // ✅ Step 4: Get fulfillment order ID (required in 2023+ APIs)
+                    $fulfillmentOrdersUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}/fulfillment_orders.json";
+                    $fulfillmentOrdersResp = Http::withHeaders($headers)->get($fulfillmentOrdersUrl);
+
+                    if ($fulfillmentOrdersResp->failed()) {
+                        return response()->json([
+                            'error' => 'Failed to fetch fulfillment orders',
+                            'response' => $fulfillmentOrdersResp->json(),
+                        ], $fulfillmentOrdersResp->status());
+                    }
+
+                    $fulfillmentOrders = $fulfillmentOrdersResp->json()['fulfillment_orders'] ?? [];
+                    if (empty($fulfillmentOrders)) {
+                        return response()->json(['error' => 'No fulfillment orders found for this order'], 404);
+                    }
+
+                    $fulfillmentOrderId = $fulfillmentOrders[0]['id']; // Take first one for simplicity
+
+                    // ✅ Step 5: Build payload (new API format)
                     $url = "https://{$shopDomain}/admin/api/2025-01/fulfillments.json";
                     $payload = [
                         'fulfillment' => [
-                            'order_id'        => $orderId,
-                            'tracking_number' => $data['tracking_number'] ?? null,
-                            'tracking_urls'   => isset($data['tracking_url']) ? [$data['tracking_url']] : [],
-                            'tracking_company' => $data['tracking_company'] ?? 'ERP Logistics',
+                            'line_items_by_fulfillment_order' => [
+                                [
+                                    'fulfillment_order_id' => $fulfillmentOrderId,
+                                ],
+                            ],
+                            'tracking_info' => [
+                                'number'  => $data['tracking_number'] ?? null,
+                                'company' => $data['tracking_company'] ?? 'ERP Logistics',
+                                'url'     => $data['tracking_url'] ?? null,
+                            ],
                             'notify_customer' => true,
                         ],
                     ];
@@ -104,7 +126,7 @@ class OrderSyncController extends Controller
                     $url = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}/cancel.json";
                     $payload = [
                         'email'  => true,
-                        'reason' => 'customer', // or 'inventory' / 'fraud'
+                        'reason' => 'customer',
                     ];
 
                     $response = Http::withHeaders($headers)->post($url, $payload);
@@ -113,7 +135,6 @@ class OrderSyncController extends Controller
                 case 'processing':
                 case 'pending':
                 case 'on-hold':
-                    // ⚠️ Shopify does not support these intermediate states via API
                     return response()->json([
                         'message' => "Shopify does not allow direct '{$status}' updates. Stored locally.",
                         'synced_to_shopify' => false,
@@ -125,7 +146,7 @@ class OrderSyncController extends Controller
                     ], 400);
             }
 
-            // ✅ Step 5: Log + return
+            // ✅ Log
             \Log::info('Shopify order status update', [
                 'order_id' => $orderId,
                 'status'   => $status,
