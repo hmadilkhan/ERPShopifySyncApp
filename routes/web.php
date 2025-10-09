@@ -31,9 +31,8 @@ Route::get('/shopify/install', function (Request $request) {
     $shop = $request->query('shop'); // e.g. my-store.myshopify.com
 
     $apiKey = config('shopify.api_key');
-    $scopes = "read_orders,write_orders,read_products,write_products,read_inventory,write_inventory";
+    $scopes = "read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments";
     $redirectUri = url('/shopify/callback');
-
     $installUrl = "https://{$shop}/admin/oauth/authorize?client_id={$apiKey}&scope={$scopes}&redirect_uri={$redirectUri}";
 
     return redirect($installUrl);
