@@ -68,7 +68,7 @@ class OrderSyncController extends Controller
 
             // ✅ Step 4: Map ERP status → Shopify fulfillment logic
             $status = strtolower($data['status']);
-            $orderId = $data['shopify_order_id'];
+            $orderId = $shopOrder->shopify_order_id;
             $shopDomain = $shop->shop_domain;
             $accessToken = $shop->access_token;
 
