@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('shopify_shops', function (Blueprint $table) {
-            $table->dropColumn('shopify_location_id')
+            $table->dropColumn('shopify_location_id');
         });
     }
 };
