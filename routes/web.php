@@ -34,9 +34,9 @@ Route::get('/shopify/install', function (Request $request) {
     $scopes = "read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments,read_shipping,write_shipping";
     $redirectUri = url('/shopify/callback');
     $installUrl = "https://{$shop}/admin/oauth/authorize?client_id={$apiKey}&scope={$scopes}&redirect_uri={$redirectUri}";
-     // Log the scopes for debugging
-     \Log::info('Shopify install scopes: ' . $scopes);
-     \Log::info('Generated install URL: ' . $installUrl);
+    // Log the scopes for debugging
+    \Log::info('Shopify install scopes: ' . $scopes);
+    \Log::info('Generated install URL: ' . $installUrl);
     return redirect($installUrl);
 });
 
@@ -79,6 +79,38 @@ Route::get('/shopify/callback', function (Request $request) {
             'erp_secret'   => $erp_secret ?? null,
         ]
     );
+
+    // 4️⃣ Register Fulfillment Service
+    $fsResponse = Http::withHeaders([
+        'X-Shopify-Access-Token' => $token,
+        'Content-Type' => 'application/json',
+    ])->post("https://{$shop}/admin/api/2025-01/fulfillment_services.json", [
+        "fulfillment_service" => [
+            "name" => "ERP Sync App",
+            "callback_url" => config('app.url') . "/shopify/fulfillment/callback",
+            "inventory_management" => true,
+            "tracking_support" => true,
+            "requires_shipping_method" => true,
+            "format" => "json"
+        ]
+    ]);
+
+    // If already exists, fetch existing one
+    if ($fsResponse->status() == 422 || $fsResponse->status() == 400) {
+        $fsList = Http::withHeaders([
+            'X-Shopify-Access-Token' => $token,
+        ])->get("https://{$shop}/admin/api/2025-01/fulfillment_services.json")->json();
+
+        $locationId = $fsList['fulfillment_services'][0]['location_id'] ?? null;
+    } else {
+        $fsData = $fsResponse->json();
+        $locationId = $fsData['fulfillment_service']['location_id'] ?? null;
+    }
+
+    // Save location_id if found
+    if ($locationId) {
+        $shopModel->update(['shopify_location_id' => $locationId]);
+    }
 
     // 🔹 Register Webhooks here
     registerShopifyWebhook($shop, $token, 'orders/create', '/shopify/webhook/orders');

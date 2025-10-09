@@ -42,12 +42,11 @@ class OrderSyncController extends Controller
         try {
             // ✅ Step 1: Validate input
             $validated = $request->validate([
-                'order_update.erp_order_id'   => 'required|numeric',
-                'order_update.status'         => 'required|string',
+                'order_update.erp_order_id'    => 'required|numeric',
+                'order_update.status'          => 'required|string',
                 'order_update.tracking_number' => 'nullable|string',
-                'order_update.tracking_url'   => 'nullable|url',
-            ], [
-                'order_update.erp_order_id.required' => 'ERP order ID is required.',
+                'order_update.tracking_url'    => 'nullable|url',
+                'order_update.tracking_company' => 'nullable|string',
             ]);
 
             $data = $request->input('order_update');
@@ -66,78 +65,86 @@ class OrderSyncController extends Controller
                 return response()->json(['error' => 'Shop not found for this order'], 404);
             }
 
-            // ✅ Step 4: Map ERP status → Shopify fulfillment logic
-            $status = strtolower($data['status']);
-            $orderId = $shopOrder->shopify_order_id;
-            $shopDomain = $shop->shop_domain;
-            $accessToken = $shop->access_token;
+            // ✅ Step 4: Map ERP status → Shopify fulfillment or cancel logic
+            $status       = strtolower($data['status']);
+            $orderId      = $shopOrder->shopify_order_id;
+            $shopDomain   = $shop->shop_domain;
+            $accessToken  = $shop->access_token;
 
-            // Different endpoints for different actions
+            // Base headers
+            $headers = [
+                'X-Shopify-Access-Token' => $accessToken,
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+            ];
+
             switch ($status) {
+
                 case 'fulfilled':
                 case 'delivered':
-                    // Create fulfillment (mark as fulfilled)
+                case 'shipped':
+                    // ✅ Fulfill the order (mark as fulfilled)
                     $url = "https://{$shopDomain}/admin/api/2025-01/fulfillments.json";
                     $payload = [
                         'fulfillment' => [
-                            'order_id' => $orderId,
+                            'order_id'        => $orderId,
                             'tracking_number' => $data['tracking_number'] ?? null,
-                            'tracking_urls' => isset($data['tracking_url']) ? [$data['tracking_url']] : [],
+                            'tracking_urls'   => isset($data['tracking_url']) ? [$data['tracking_url']] : [],
+                            'tracking_company' => $data['tracking_company'] ?? 'ERP Logistics',
                             'notify_customer' => true,
                         ],
                     ];
-                    $method = 'post';
+
+                    $response = Http::withHeaders($headers)->post($url, $payload);
                     break;
 
                 case 'cancelled':
-                    // Cancel order
+                case 'canceled':
+                    // ✅ Cancel the order
                     $url = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}/cancel.json";
                     $payload = [
-                        'email' => true,
-                        'reason' => 'customer',
+                        'email'  => true,
+                        'reason' => 'customer', // or 'inventory' / 'fraud'
                     ];
-                    $method = 'post';
+
+                    $response = Http::withHeaders($headers)->post($url, $payload);
                     break;
 
-                case 'on-hold':
                 case 'processing':
                 case 'pending':
-                    // Shopify doesn’t support these via API directly — just store locally
+                case 'on-hold':
+                    // ⚠️ Shopify does not support these intermediate states via API
                     return response()->json([
                         'message' => "Shopify does not allow direct '{$status}' updates. Stored locally.",
                         'synced_to_shopify' => false,
                     ]);
 
                 default:
-                    return response()->json(['error' => "Unsupported status '{$status}'"], 400);
+                    return response()->json([
+                        'error' => "Unsupported status '{$status}'"
+                    ], 400);
             }
 
-            // ✅ Step 5: Send the request to Shopify
-            $response = Http::withHeaders([
-                'X-Shopify-Access-Token' => $accessToken,
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ])->{$method}($url, $payload);
-
-            // ✅ Step 6: Log and return response
+            // ✅ Step 5: Log + return
             \Log::info('Shopify order status update', [
                 'order_id' => $orderId,
-                'status' => $status,
+                'status'   => $status,
+                'payload'  => $payload,
                 'response' => $response->json(),
             ]);
 
             if ($response->failed()) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to update order status in Shopify',
+                    'success'  => false,
+                    'message'  => 'Failed to update order status in Shopify',
                     'response' => $response->json(),
                 ], $response->status());
             }
 
             return response()->json([
-                'success' => true,
-                'message' => 'Order status synced successfully with Shopify',
-                'shopify_response' => $response->json(),
+                'success'           => true,
+                'message'           => "Order status '{$status}' synced successfully with Shopify",
+                'shopify_response'  => $response->json(),
             ]);
         } catch (\Throwable $e) {
             \Log::error('Shopify order status update failed', [
@@ -147,7 +154,7 @@ class OrderSyncController extends Controller
 
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
