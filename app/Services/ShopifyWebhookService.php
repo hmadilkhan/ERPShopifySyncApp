@@ -16,8 +16,8 @@ class ShopifyWebhookService
             'products/update',
             'products/delete',
             'inventory_levels/update',
-            'read_fulfillments',
-            'write_fulfillments'
+            'fulfillments/create',
+            'fulfillments/update'
         ];
 
         foreach ($topics as $topic) {

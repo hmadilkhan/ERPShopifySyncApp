@@ -31,12 +31,15 @@ Route::get('/shopify/install', function (Request $request) {
     $shop = $request->query('shop'); // e.g. my-store.myshopify.com
 
     $apiKey = config('shopify.api_key');
-    $scopes = "read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments";
+    $scopes = "read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments,read_shipping,write_shipping";
     $redirectUri = url('/shopify/callback');
     $installUrl = "https://{$shop}/admin/oauth/authorize?client_id={$apiKey}&scope={$scopes}&redirect_uri={$redirectUri}";
-
+     // Log the scopes for debugging
+     \Log::info('Shopify install scopes: ' . $scopes);
+     \Log::info('Generated install URL: ' . $installUrl);
     return redirect($installUrl);
 });
+
 
 Route::get('/shopify/callback', function (Request $request) {
     $shop = $request->query('shop');
