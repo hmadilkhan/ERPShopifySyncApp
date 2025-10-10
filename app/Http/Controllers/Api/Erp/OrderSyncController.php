@@ -70,26 +70,27 @@ class OrderSyncController extends Controller
                         $orderGid = "gid://shopify/Order/{$orderId}";
                         $graphqlUrl = "https://{$shopDomain}/admin/api/2025-01/graphql.json";
 
-                        // Step 1️⃣ - GraphQL: get fulfillment orders
+                        // Step 1: Fetch fulfillment orders
                         $query = <<<GQL
-                            query GetFulfillmentOrders(\$orderId: ID!) {
-                                order(id: \$orderId) {
-                                    id
-                                    name
-                                    fulfillmentStatus
-                                    fulfillmentOrders(first: 10) {
-                                        edges {
-                                            node {
-                                                id
-                                                status
-                                                lineItems(first: 20) {
-                                                    edges {
-                                                        node {
-                                                            id
-                                                            remainingQuantity
-                                                            lineItem {
-                                                                name
-                                                            }
+                        query GetFulfillmentOrders(\$orderId: ID!) {
+                            order(id: \$orderId) {
+                                id
+                                name
+                                fulfillmentOrders(first: 10) {
+                                    edges {
+                                        node {
+                                            id
+                                            status
+                                            location {
+                                                name
+                                            }
+                                            lineItems(first: 50) {
+                                                edges {
+                                                    node {
+                                                        id
+                                                        remainingQuantity
+                                                        lineItem {
+                                                            name
                                                         }
                                                     }
                                                 }
@@ -98,6 +99,7 @@ class OrderSyncController extends Controller
                                     }
                                 }
                             }
+                        }
                         GQL;
 
                         $graphqlResponse = Http::withHeaders($headers)->post($graphqlUrl, [
@@ -105,113 +107,64 @@ class OrderSyncController extends Controller
                             'variables' => ['orderId' => $orderGid],
                         ]);
 
-                        if ($graphqlResponse->failed()) {
+                        $dataGraph = $graphqlResponse->json();
+
+                        if (
+                            !isset($dataGraph['data']['order']['fulfillmentOrders']['edges']) ||
+                            empty($dataGraph['data']['order']['fulfillmentOrders']['edges'])
+                        ) {
                             return response()->json([
-                                'error' => 'Failed to fetch fulfillment orders (GraphQL)',
-                                'response' => $graphqlResponse->json(),
-                            ], $graphqlResponse->status());
+                                'error' => 'No fulfillment orders found (may already be fulfilled)',
+                                'shopify_response' => $dataGraph,
+                            ], 404);
                         }
 
-                        $orderData = $graphqlResponse->json('data.order');
-                        $fulfillmentOrders = $orderData['fulfillmentOrders']['edges'] ?? [];
-                        $currentFulfillmentStatus = $orderData['fulfillmentStatus'] ?? null;
+                        // Step 2: Find first OPEN fulfillment order
+                        $fulfillmentOrders = $dataGraph['data']['order']['fulfillmentOrders']['edges'];
+                        $openOrder = collect($fulfillmentOrders)->firstWhere('node.status', 'OPEN');
 
-                        // Step 2️⃣ - If already fulfilled, update tracking or add tag
-                        // if ($currentFulfillmentStatus === 'FULFILLED') {
-                        //     \Log::info("ℹ️ Order {$orderId} already fulfilled, updating tracking info instead");
+                        if (!$openOrder) {
+                            return response()->json([
+                                'error' => 'No OPEN fulfillment order found',
+                                'details' => $fulfillmentOrders,
+                            ], 404);
+                        }
 
-                        //     // Use REST API for updating tracking
-                        //     $orderUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}.json";
-                        //     $orderResp = Http::withHeaders($headers)->get($orderUrl);
-                        //     $orderJson = $orderResp->json('order') ?? [];
-                        //     $fulfillments = $orderJson['fulfillments'] ?? [];
-
-                        //     if (!empty($fulfillments)) {
-                        //         $fulfillmentId = $fulfillments[0]['id'] ?? null;
-                        //         if ($fulfillmentId) {
-                        //             $updateUrl = "https://{$shopDomain}/admin/api/2025-01/fulfillments/{$fulfillmentId}.json";
-                        //             $updatePayload = [
-                        //                 'fulfillment' => [
-                        //                     'tracking_number'  => $data['tracking_number'] ?? null,
-                        //                     'tracking_company' => $data['tracking_company'] ?? 'ERP Logistics',
-                        //                     'tracking_url'     => $data['tracking_url'] ?? null,
-                        //                     'notify_customer'  => $data['notify_customer'] ?? true,
-                        //                 ],
-                        //             ];
-                        //             $updateResp = Http::withHeaders($headers)->put($updateUrl, $updatePayload);
-                        //             return response()->json([
-                        //                 'success' => true,
-                        //                 'message' => "Order {$orderId} already fulfilled — tracking updated",
-                        //                 'shopify_response' => $updateResp->json(),
-                        //             ]);
-                        //         }
-                        //     }
-
-                        //     return response()->json([
-                        //         'success' => true,
-                        //         'message' => "Order {$orderId} already fulfilled, nothing to update",
-                        //     ]);
-                        // }
-
-                        // Step 3️⃣ - If not fulfilled and no fulfillment orders → fallback to REST
-                        // if (empty($fulfillmentOrders)) {
-                        //     \Log::warning("⚠️ No fulfillment orders found via GraphQL for {$orderId}, trying REST fallback");
-
-                        //     $fallbackUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}/fulfillment_orders.json";
-                        //     $fallbackResp = Http::withHeaders($headers)->get($fallbackUrl);
-
-                        //     if ($fallbackResp->failed()) {
-                        //         return response()->json([
-                        //             'error' => 'No fulfillment orders found even in fallback',
-                        //             'response' => $fallbackResp->json(),
-                        //         ], $fallbackResp->status());
-                        //     }
-
-                        //     $fulfillmentOrders = $fallbackResp->json('fulfillment_orders') ?? [];
-                        //     if (empty($fulfillmentOrders)) {
-                        //         return response()->json([
-                        //             'error' => 'No fulfillment orders found in REST fallback either',
-                        //             'message' => 'Order may already be fulfilled or cancelled',
-                        //         ], 404);
-                        //     }
-                        // }
-
-                        // Step 4️⃣ - Fulfill using GraphQL mutation
-                        $firstOrder = $fulfillmentOrders[0]['node'] ?? $fulfillmentOrders[0]; // supports both GraphQL + REST
-                        $fulfillmentOrderId = $firstOrder['id'];
-                        $lineItems = $firstOrder['lineItems']['edges'] ?? $firstOrder['line_items'] ?? [];
+                        $fulfillmentOrderId = $openOrder['node']['id'];
+                        $lineItems = $openOrder['node']['lineItems']['edges'];
 
                         $lineItemInputs = [];
                         foreach ($lineItems as $item) {
-                            $node = $item['node'] ?? $item;
                             $lineItemInputs[] = [
-                                'id' => $node['id'],
-                                'quantity' => $node['remainingQuantity'] ?? 1,
+                                'id' => $item['node']['id'],
+                                'quantity' => (int)($item['node']['remainingQuantity'] ?? 1),
                             ];
                         }
 
+                        // Step 3: Create fulfillment with fulfillmentOrderId (required)
                         $mutation = <<<GQL
-                            mutation FulfillOrder(\$input: FulfillmentCreateV2Input!) {
-                                fulfillmentCreateV2(input: \$input) {
-                                    fulfillment {
-                                        id
-                                        status
-                                        trackingInfo {
-                                            number
-                                            url
-                                            company
-                                        }
-                                    }
-                                    userErrors {
-                                        field
-                                        message
+                        mutation FulfillOrder(\$input: FulfillmentCreateV2Input!) {
+                            fulfillmentCreateV2(input: \$input) {
+                                fulfillment {
+                                    id
+                                    status
+                                    trackingInfo {
+                                        number
+                                        company
+                                        url
                                     }
                                 }
+                                userErrors {
+                                    field
+                                    message
+                                }
                             }
+                        }
                         GQL;
 
                         $variables = [
                             'input' => [
+                                'fulfillmentOrderId' => $fulfillmentOrderId,
                                 'fulfillmentOrderLineItems' => $lineItemInputs,
                                 'trackingInfo' => [
                                     'number' => $data['tracking_number'] ?? null,
@@ -239,7 +192,7 @@ class OrderSyncController extends Controller
                             ], 422);
                         }
 
-                        // Add delivered tag if needed
+                        // Optional: Tag as delivered
                         if ($status === 'delivered') {
                             $this->updateOrderTags($shopDomain, $orderId, $headers, 'delivered');
                         }
