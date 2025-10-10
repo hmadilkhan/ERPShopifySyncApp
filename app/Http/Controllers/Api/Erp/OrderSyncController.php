@@ -127,6 +127,11 @@ class OrderSyncController extends Controller
                     $payload = [
                         'email'  => true,
                         'reason' => 'customer',
+                        "restock" => true,
+                        // "refund" => [
+                        //     "notify" => true,
+                        //     "note" => "Customer requested cancellation"
+                        // ]
                     ];
 
                     $response = Http::withHeaders($headers)->post($url, $payload);
