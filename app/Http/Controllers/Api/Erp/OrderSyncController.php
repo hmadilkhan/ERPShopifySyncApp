@@ -117,41 +117,41 @@ class OrderSyncController extends Controller
                         $currentFulfillmentStatus = $orderData['fulfillmentStatus'] ?? null;
 
                         // Step 2️⃣ - If already fulfilled, update tracking or add tag
-                        if ($currentFulfillmentStatus === 'FULFILLED') {
-                            \Log::info("ℹ️ Order {$orderId} already fulfilled, updating tracking info instead");
+                        // if ($currentFulfillmentStatus === 'FULFILLED') {
+                        //     \Log::info("ℹ️ Order {$orderId} already fulfilled, updating tracking info instead");
 
-                            // Use REST API for updating tracking
-                            $orderUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}.json";
-                            $orderResp = Http::withHeaders($headers)->get($orderUrl);
-                            $orderJson = $orderResp->json('order') ?? [];
-                            $fulfillments = $orderJson['fulfillments'] ?? [];
+                        //     // Use REST API for updating tracking
+                        //     $orderUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}.json";
+                        //     $orderResp = Http::withHeaders($headers)->get($orderUrl);
+                        //     $orderJson = $orderResp->json('order') ?? [];
+                        //     $fulfillments = $orderJson['fulfillments'] ?? [];
 
-                            if (!empty($fulfillments)) {
-                                $fulfillmentId = $fulfillments[0]['id'] ?? null;
-                                if ($fulfillmentId) {
-                                    $updateUrl = "https://{$shopDomain}/admin/api/2025-01/fulfillments/{$fulfillmentId}.json";
-                                    $updatePayload = [
-                                        'fulfillment' => [
-                                            'tracking_number'  => $data['tracking_number'] ?? null,
-                                            'tracking_company' => $data['tracking_company'] ?? 'ERP Logistics',
-                                            'tracking_url'     => $data['tracking_url'] ?? null,
-                                            'notify_customer'  => $data['notify_customer'] ?? true,
-                                        ],
-                                    ];
-                                    $updateResp = Http::withHeaders($headers)->put($updateUrl, $updatePayload);
-                                    return response()->json([
-                                        'success' => true,
-                                        'message' => "Order {$orderId} already fulfilled — tracking updated",
-                                        'shopify_response' => $updateResp->json(),
-                                    ]);
-                                }
-                            }
+                        //     if (!empty($fulfillments)) {
+                        //         $fulfillmentId = $fulfillments[0]['id'] ?? null;
+                        //         if ($fulfillmentId) {
+                        //             $updateUrl = "https://{$shopDomain}/admin/api/2025-01/fulfillments/{$fulfillmentId}.json";
+                        //             $updatePayload = [
+                        //                 'fulfillment' => [
+                        //                     'tracking_number'  => $data['tracking_number'] ?? null,
+                        //                     'tracking_company' => $data['tracking_company'] ?? 'ERP Logistics',
+                        //                     'tracking_url'     => $data['tracking_url'] ?? null,
+                        //                     'notify_customer'  => $data['notify_customer'] ?? true,
+                        //                 ],
+                        //             ];
+                        //             $updateResp = Http::withHeaders($headers)->put($updateUrl, $updatePayload);
+                        //             return response()->json([
+                        //                 'success' => true,
+                        //                 'message' => "Order {$orderId} already fulfilled — tracking updated",
+                        //                 'shopify_response' => $updateResp->json(),
+                        //             ]);
+                        //         }
+                        //     }
 
-                            return response()->json([
-                                'success' => true,
-                                'message' => "Order {$orderId} already fulfilled, nothing to update",
-                            ]);
-                        }
+                        //     return response()->json([
+                        //         'success' => true,
+                        //         'message' => "Order {$orderId} already fulfilled, nothing to update",
+                        //     ]);
+                        // }
 
                         // Step 3️⃣ - If not fulfilled and no fulfillment orders → fallback to REST
                         // if (empty($fulfillmentOrders)) {
