@@ -7,6 +7,7 @@ use App\Models\ShopifyOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\ShopifyShop;
+use Illuminate\Support\Facades\Log;
 
 class OrderSyncController extends Controller
 {
@@ -370,7 +371,7 @@ class OrderSyncController extends Controller
                     $orderData = $orderResp->json()['order'] ?? null;
                     $currentFulfillmentStatus = $orderData['fulfillment_status'] ?? null;
                     $financialStatus = $orderData['financial_status'] ?? null;
-
+                    Log::info("Fulfillment Status".$currentFulfillmentStatus);
                     // ✅ Step 4.1: Check if payment is complete (optional based on business logic)
                     // $requirePayment = $data['require_payment'] ?? true; // Default: require payment
 
