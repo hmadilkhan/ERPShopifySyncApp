@@ -369,6 +369,29 @@ class OrderSyncController extends Controller
 
                     $orderData = $orderResp->json()['order'] ?? null;
                     $currentFulfillmentStatus = $orderData['fulfillment_status'] ?? null;
+                    $financialStatus = $orderData['financial_status'] ?? null;
+
+                    // ✅ Step 4.1: Check if payment is complete (optional based on business logic)
+                    $requirePayment = $data['require_payment'] ?? true; // Default: require payment
+
+                    if ($requirePayment) {
+                        $allowedFinancialStatuses = ['paid', 'partially_paid', 'authorized'];
+
+                        if (!in_array($financialStatus, $allowedFinancialStatuses)) {
+                            return response()->json([
+                                'success' => false,
+                                'error' => 'Cannot fulfill order: Payment not completed',
+                                'financial_status' => $financialStatus,
+                                'message' => 'Order must be paid, authorized, or partially paid before fulfillment',
+                                'order_id' => $orderId,
+                            ], 422);
+                        }
+
+                        \Log::info('Payment check passed for fulfillment', [
+                            'order_id' => $orderId,
+                            'financial_status' => $financialStatus,
+                        ]);
+                    }
 
                     // ✅ If already fulfilled, update tracking or just add tags
                     if ($currentFulfillmentStatus === 'fulfilled') {
@@ -411,6 +434,54 @@ class OrderSyncController extends Controller
                         }
                         break;
                     }
+
+                    // ✅ Step 5: Get fulfillment order ID (for unfulfilled orders)
+                    $fulfillmentOrdersUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}/fulfillment_orders.json";
+                    $fulfillmentOrdersResp = Http::withHeaders($headers)->get($fulfillmentOrdersUrl);
+
+                    if ($fulfillmentOrdersResp->failed()) {
+                        return response()->json([
+                            'error' => 'Failed to fetch fulfillment orders',
+                            'response' => $fulfillmentOrdersResp->json(),
+                        ], $fulfillmentOrdersResp->status());
+                    }
+
+                    $fulfillmentOrders = $fulfillmentOrdersResp->json()['fulfillment_orders'] ?? [];
+                    if (empty($fulfillmentOrders)) {
+                        return response()->json([
+                            'error' => 'No fulfillment orders available',
+                            'message' => 'Order may already be fulfilled or cancelled',
+                            'current_status' => $currentFulfillmentStatus,
+                        ], 404);
+                    }
+
+                    $fulfillmentOrderId = $fulfillmentOrders[0]['id']; // Take first one for simplicity
+
+                    // ✅ Step 6: Build payload (new API format)
+                    $url = "https://{$shopDomain}/admin/api/2025-01/fulfillments.json";
+                    $payload = [
+                        'fulfillment' => [
+                            'line_items_by_fulfillment_order' => [
+                                [
+                                    'fulfillment_order_id' => $fulfillmentOrderId,
+                                ],
+                            ],
+                            'tracking_info' => [
+                                'number'  => $data['tracking_number'] ?? null,
+                                'company' => $data['tracking_company'] ?? 'ERP Logistics',
+                                'url'     => $data['tracking_url'] ?? null,
+                            ],
+                            'notify_customer' => $data['notify_customer'] ?? true,
+                        ],
+                    ];
+
+                    $response = Http::withHeaders($headers)->post($url, $payload);
+
+                    // ✅ Optional: Add custom tag for delivered status
+                    if ($status === 'delivered' && $response->successful()) {
+                        $this->updateOrderTags($shopDomain, $orderId, $headers, 'delivered');
+                    }
+                    break;
 
                 case 'cancelled':
                 case 'canceled':
@@ -630,7 +701,6 @@ class OrderSyncController extends Controller
             ], 500);
         }
     }
-
 
     /**
      * Helper method to update order tags
