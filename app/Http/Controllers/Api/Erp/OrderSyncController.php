@@ -248,6 +248,60 @@ class OrderSyncController extends Controller
     
     */
 
+    // public function updateOrderStatus(Request $request)
+    // {
+    //     try {
+    //         // ✅ Step 1: Validate input
+    //         $validated = $request->validate([
+    //             'order_update.erp_order_id'      => 'required|numeric',
+    //             'order_update.status'            => 'required|string',
+    //             'order_update.tracking_number'   => 'nullable|string',
+    //             'order_update.tracking_url'      => 'nullable|url',
+    //             'order_update.tracking_company'  => 'nullable|string',
+    //             'order_update.reason'            => 'nullable|string',
+    //             'order_update.note'              => 'nullable|string',
+    //             'order_update.refund_amount'     => 'nullable|numeric',
+    //             'order_update.restock'           => 'nullable|boolean',
+    //             'order_update.notify_customer'   => 'nullable|boolean',
+    //             'order_update.return_reason'     => 'nullable|string',
+    //             'order_update.return_note'       => 'nullable|string',
+    //         ]);
+
+    //         $data = $request->input('order_update');
+
+    //         // ✅ Step 2: Find the local Shopify order record
+    //         $shopOrder = ShopifyOrder::where('erp_order_id', $data['erp_order_id'])->first();
+
+    //         if (!$shopOrder) {
+    //             return response()->json(['error' => 'Shopify order not found for ERP order ID'], 404);
+    //         }
+
+    //         // ✅ Step 3: Get shop credentials
+    //         $shop = ShopifyShop::find($shopOrder->shop_id);
+
+    //         if (!$shop) {
+    //             return response()->json(['error' => 'Shop not found for this order'], 404);
+    //         }
+
+    //         $status      = strtolower($data['status']);
+    //         $orderId     = $shopOrder->shopify_order_id;
+    //         $shopDomain  = $shop->shop_domain;
+    //         $accessToken = $shop->access_token;
+
+    //         $headers = [
+    //             'X-Shopify-Access-Token' => $accessToken,
+    //             'Accept' => 'application/json',
+    //             'Content-Type' => 'application/json',
+    //         ];
+
+    //         $response = null;
+    //         $payload = [];
+
+    //         switch ($status) {
+
+    //             case 'fulfilled':
+    //             case 'delivered':
+    //             case 'shipped':
     public function updateOrderStatus(Request $request)
     {
         try {
@@ -302,115 +356,61 @@ class OrderSyncController extends Controller
                 case 'fulfilled':
                 case 'delivered':
                 case 'shipped':
-                    public function updateOrderStatus(Request $request)
-{
-    try {
-        // ✅ Step 1: Validate input
-        $validated = $request->validate([
-            'order_update.erp_order_id'      => 'required|numeric',
-            'order_update.status'            => 'required|string',
-            'order_update.tracking_number'   => 'nullable|string',
-            'order_update.tracking_url'      => 'nullable|url',
-            'order_update.tracking_company'  => 'nullable|string',
-            'order_update.reason'            => 'nullable|string',
-            'order_update.note'              => 'nullable|string',
-            'order_update.refund_amount'     => 'nullable|numeric',
-            'order_update.restock'           => 'nullable|boolean',
-            'order_update.notify_customer'   => 'nullable|boolean',
-            'order_update.return_reason'     => 'nullable|string',
-            'order_update.return_note'       => 'nullable|string',
-        ]);
+                    // ✅ Step 4: Check current order status first
+                    $orderUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}.json";
+                    $orderResp = Http::withHeaders($headers)->get($orderUrl);
 
-        $data = $request->input('order_update');
-
-        // ✅ Step 2: Find the local Shopify order record
-        $shopOrder = ShopifyOrder::where('erp_order_id', $data['erp_order_id'])->first();
-
-        if (!$shopOrder) {
-            return response()->json(['error' => 'Shopify order not found for ERP order ID'], 404);
-        }
-
-        // ✅ Step 3: Get shop credentials
-        $shop = ShopifyShop::find($shopOrder->shop_id);
-
-        if (!$shop) {
-            return response()->json(['error' => 'Shop not found for this order'], 404);
-        }
-
-        $status      = strtolower($data['status']);
-        $orderId     = $shopOrder->shopify_order_id;
-        $shopDomain  = $shop->shop_domain;
-        $accessToken = $shop->access_token;
-
-        $headers = [
-            'X-Shopify-Access-Token' => $accessToken,
-            'Accept' => 'application/json',
-            'Content-Type' => 'application/json',
-        ];
-
-        $response = null;
-        $payload = [];
-
-        switch ($status) {
-
-            case 'fulfilled':
-            case 'delivered':
-            case 'shipped':
-                // ✅ Step 4: Check current order status first
-                $orderUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}.json";
-                $orderResp = Http::withHeaders($headers)->get($orderUrl);
-
-                if ($orderResp->failed()) {
-                    return response()->json([
-                        'error' => 'Failed to fetch order details',
-                        'response' => $orderResp->json(),
-                    ], $orderResp->status());
-                }
-
-                $orderData = $orderResp->json()['order'] ?? null;
-                $currentFulfillmentStatus = $orderData['fulfillment_status'] ?? null;
-
-                // ✅ If already fulfilled, update tracking or just add tags
-                if ($currentFulfillmentStatus === 'fulfilled') {
-                    $fulfillments = $orderData['fulfillments'] ?? [];
-                    
-                    if (!empty($fulfillments) && isset($data['tracking_number'])) {
-                        // Update existing fulfillment with tracking
-                        $fulfillmentId = $fulfillments[0]['id'];
-                        $url = "https://{$shopDomain}/admin/api/2025-01/fulfillments/{$fulfillmentId}.json";
-                        
-                        $payload = [
-                            'fulfillment' => [
-                                'tracking_number' => $data['tracking_number'],
-                                'tracking_company' => $data['tracking_company'] ?? 'ERP Logistics',
-                                'tracking_url' => $data['tracking_url'] ?? null,
-                                'notify_customer' => $data['notify_customer'] ?? true,
-                            ],
-                        ];
-
-                        $response = Http::withHeaders($headers)->put($url, $payload);
-
-                        \Log::info('Updated tracking for already fulfilled order', [
-                            'order_id' => $orderId,
-                            'fulfillment_id' => $fulfillmentId,
-                        ]);
-                    } else {
-                        // Just update tags if no tracking to add
-                        $this->updateOrderTags($shopDomain, $orderId, $headers, $status, $data['note'] ?? "Status updated to {$status}");
-                        
+                    if ($orderResp->failed()) {
                         return response()->json([
-                            'success' => true,
-                            'message' => "Order already fulfilled. Tag '{$status}' added.",
-                            'already_fulfilled' => true,
-                        ]);
+                            'error' => 'Failed to fetch order details',
+                            'response' => $orderResp->json(),
+                        ], $orderResp->status());
                     }
 
-                    // Add status tag
-                    if ($status === 'delivered') {
-                        $this->updateOrderTags($shopDomain, $orderId, $headers, 'delivered');
+                    $orderData = $orderResp->json()['order'] ?? null;
+                    $currentFulfillmentStatus = $orderData['fulfillment_status'] ?? null;
+
+                    // ✅ If already fulfilled, update tracking or just add tags
+                    if ($currentFulfillmentStatus === 'fulfilled') {
+                        $fulfillments = $orderData['fulfillments'] ?? [];
+
+                        if (!empty($fulfillments) && isset($data['tracking_number'])) {
+                            // Update existing fulfillment with tracking
+                            $fulfillmentId = $fulfillments[0]['id'];
+                            $url = "https://{$shopDomain}/admin/api/2025-01/fulfillments/{$fulfillmentId}.json";
+
+                            $payload = [
+                                'fulfillment' => [
+                                    'tracking_number' => $data['tracking_number'],
+                                    'tracking_company' => $data['tracking_company'] ?? 'ERP Logistics',
+                                    'tracking_url' => $data['tracking_url'] ?? null,
+                                    'notify_customer' => $data['notify_customer'] ?? true,
+                                ],
+                            ];
+
+                            $response = Http::withHeaders($headers)->put($url, $payload);
+
+                            \Log::info('Updated tracking for already fulfilled order', [
+                                'order_id' => $orderId,
+                                'fulfillment_id' => $fulfillmentId,
+                            ]);
+                        } else {
+                            // Just update tags if no tracking to add
+                            $this->updateOrderTags($shopDomain, $orderId, $headers, $status, $data['note'] ?? "Status updated to {$status}");
+
+                            return response()->json([
+                                'success' => true,
+                                'message' => "Order already fulfilled. Tag '{$status}' added.",
+                                'already_fulfilled' => true,
+                            ]);
+                        }
+
+                        // Add status tag
+                        if ($status === 'delivered') {
+                            $this->updateOrderTags($shopDomain, $orderId, $headers, 'delivered');
+                        }
+                        break;
                     }
-                    break;
-                }
 
                 case 'cancelled':
                 case 'canceled':
@@ -630,6 +630,7 @@ class OrderSyncController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Helper method to update order tags
