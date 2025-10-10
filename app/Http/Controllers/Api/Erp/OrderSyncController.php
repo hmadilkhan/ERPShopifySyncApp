@@ -72,25 +72,29 @@ class OrderSyncController extends Controller
 
                         // Step 1: Fetch fulfillment orders
                         $query = <<<GQL
-                        query GetFulfillmentOrders(\$orderId: ID!) {
-                            order(id: \$orderId) {
-                                id
-                                name
-                                fulfillmentOrders(first: 10) {
-                                    edges {
-                                        node {
-                                            id
-                                            status
-                                            location {
-                                                name
-                                            }
-                                            lineItems(first: 50) {
-                                                edges {
-                                                    node {
+                            query GetFulfillmentOrders(\$orderId: ID!) {
+                                order(id: \$orderId) {
+                                    id
+                                    name
+                                    fulfillmentOrders(first: 10) {
+                                        edges {
+                                            node {
+                                                id
+                                                status
+                                                assignedLocation {
+                                                    location {
                                                         id
-                                                        remainingQuantity
-                                                        lineItem {
-                                                            name
+                                                        name
+                                                    }
+                                                }
+                                                lineItems(first: 50) {
+                                                    edges {
+                                                        node {
+                                                            id
+                                                            remainingQuantity
+                                                            lineItem {
+                                                                name
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -99,8 +103,7 @@ class OrderSyncController extends Controller
                                     }
                                 }
                             }
-                        }
-                        GQL;
+                            GQL;
 
                         $graphqlResponse = Http::withHeaders($headers)->post($graphqlUrl, [
                             'query' => $query,
