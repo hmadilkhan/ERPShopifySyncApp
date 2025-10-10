@@ -372,26 +372,26 @@ class OrderSyncController extends Controller
                     $financialStatus = $orderData['financial_status'] ?? null;
 
                     // ✅ Step 4.1: Check if payment is complete (optional based on business logic)
-                    $requirePayment = $data['require_payment'] ?? true; // Default: require payment
+                    // $requirePayment = $data['require_payment'] ?? true; // Default: require payment
 
-                    if ($requirePayment) {
-                        $allowedFinancialStatuses = ['paid', 'partially_paid', 'authorized'];
+                    // if ($requirePayment) {
+                    //     $allowedFinancialStatuses = ['paid', 'partially_paid', 'authorized'];
 
-                        if (!in_array($financialStatus, $allowedFinancialStatuses)) {
-                            return response()->json([
-                                'success' => false,
-                                'error' => 'Cannot fulfill order: Payment not completed',
-                                'financial_status' => $financialStatus,
-                                'message' => 'Order must be paid, authorized, or partially paid before fulfillment',
-                                'order_id' => $orderId,
-                            ], 422);
-                        }
+                    //     if (!in_array($financialStatus, $allowedFinancialStatuses)) {
+                    //         return response()->json([
+                    //             'success' => false,
+                    //             'error' => 'Cannot fulfill order: Payment not completed',
+                    //             'financial_status' => $financialStatus,
+                    //             'message' => 'Order must be paid, authorized, or partially paid before fulfillment',
+                    //             'order_id' => $orderId,
+                    //         ], 422);
+                    //     }
 
-                        \Log::info('Payment check passed for fulfillment', [
-                            'order_id' => $orderId,
-                            'financial_status' => $financialStatus,
-                        ]);
-                    }
+                    //     \Log::info('Payment check passed for fulfillment', [
+                    //         'order_id' => $orderId,
+                    //         'financial_status' => $financialStatus,
+                    //     ]);
+                    // }
 
                     // ✅ If already fulfilled, update tracking or just add tags
                     if ($currentFulfillmentStatus === 'fulfilled') {
