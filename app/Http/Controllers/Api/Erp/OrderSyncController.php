@@ -154,27 +154,27 @@ class OrderSyncController extends Controller
                         }
 
                         // Step 3️⃣ - If not fulfilled and no fulfillment orders → fallback to REST
-                        if (empty($fulfillmentOrders)) {
-                            \Log::warning("⚠️ No fulfillment orders found via GraphQL for {$orderId}, trying REST fallback");
+                        // if (empty($fulfillmentOrders)) {
+                        //     \Log::warning("⚠️ No fulfillment orders found via GraphQL for {$orderId}, trying REST fallback");
 
-                            $fallbackUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}/fulfillment_orders.json";
-                            $fallbackResp = Http::withHeaders($headers)->get($fallbackUrl);
+                        //     $fallbackUrl = "https://{$shopDomain}/admin/api/2025-01/orders/{$orderId}/fulfillment_orders.json";
+                        //     $fallbackResp = Http::withHeaders($headers)->get($fallbackUrl);
 
-                            if ($fallbackResp->failed()) {
-                                return response()->json([
-                                    'error' => 'No fulfillment orders found even in fallback',
-                                    'response' => $fallbackResp->json(),
-                                ], $fallbackResp->status());
-                            }
+                        //     if ($fallbackResp->failed()) {
+                        //         return response()->json([
+                        //             'error' => 'No fulfillment orders found even in fallback',
+                        //             'response' => $fallbackResp->json(),
+                        //         ], $fallbackResp->status());
+                        //     }
 
-                            $fulfillmentOrders = $fallbackResp->json('fulfillment_orders') ?? [];
-                            if (empty($fulfillmentOrders)) {
-                                return response()->json([
-                                    'error' => 'No fulfillment orders found in REST fallback either',
-                                    'message' => 'Order may already be fulfilled or cancelled',
-                                ], 404);
-                            }
-                        }
+                        //     $fulfillmentOrders = $fallbackResp->json('fulfillment_orders') ?? [];
+                        //     if (empty($fulfillmentOrders)) {
+                        //         return response()->json([
+                        //             'error' => 'No fulfillment orders found in REST fallback either',
+                        //             'message' => 'Order may already be fulfilled or cancelled',
+                        //         ], 404);
+                        //     }
+                        // }
 
                         // Step 4️⃣ - Fulfill using GraphQL mutation
                         $firstOrder = $fulfillmentOrders[0]['node'] ?? $fulfillmentOrders[0]; // supports both GraphQL + REST
