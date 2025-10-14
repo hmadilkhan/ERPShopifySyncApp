@@ -115,6 +115,7 @@ class ProductSyncController extends Controller
             return response()->json([
                 'success' => $response->successful(),
                 'shopify_response' => $result,
+                'id' => $data['id']
             ], $response->status());
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
