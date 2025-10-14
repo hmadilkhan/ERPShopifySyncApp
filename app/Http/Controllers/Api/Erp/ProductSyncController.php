@@ -12,7 +12,7 @@ class ProductSyncController extends Controller
 {
     public function syncProduct(ProductSyncRequest $request)
     {
-        return 1;
+        \Log::info('ERP Product Sync Controller reached!', $request->all());
         $data = $request->validated()['product'];
         $shop = ShopifyShop::first(); // TODO: map ERP → correct shop
 
