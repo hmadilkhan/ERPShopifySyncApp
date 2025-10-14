@@ -9,13 +9,13 @@ use App\Http\Controllers\Webhook\ShopifyWebhookController;
 // Group ERP routes
 Route::prefix('erp')->middleware('auth.erp')->group(function () {
     // Route::post('/products/sync', [ProductSyncController::class, 'syncProduct']);
-    // Route::post('/products/sync', [\App\Http\Controllers\Api\Erp\ProductSyncController::class, 'syncProduct']);
+    Route::post('/products/sync', [\App\Http\Controllers\Api\Erp\ProductSyncController::class, 'syncProduct']);
     Route::post('/stock-updated', [StockSyncController::class, 'updateStock']);
     Route::post('/orders/update-status', [OrderSyncController::class, 'updateOrderStatus']);
 });
 
 // Direct route for ERP product sync (matches the URL you're trying to access)
-Route::post('/erp/products/sync', [\App\Http\Controllers\Api\Erp\ProductSyncController::class, 'syncProduct']);
+// Route::post('/erp/products/sync', [\App\Http\Controllers\Api\Erp\ProductSyncController::class, 'syncProduct']);
 
 Route::prefix('webhooks/shopify')->middleware('verify.shopify.webhook')->group(function () {
     Route::post('/orders/create', [ShopifyWebhookController::class, 'orderCreated']);

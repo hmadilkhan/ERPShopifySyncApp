@@ -13,6 +13,7 @@ class ProductSyncController extends Controller
 {
     public function syncProduct(Request $request)
     {
+        return $request;
         \Log::info('ERP Product Sync Controller reached!', $request->all());
 
         // Validate the request manually since we're not using FormRequest
