@@ -37,26 +37,65 @@ class ProductSyncController extends Controller
             ]
         ];
 
+        //  // ✅ Build ERP payload
+        //  $payload = [
+        //     'product' => [
+        //         'sku'          => $product->sku,
+        //         'title'        => $product->title,
+        //         'description'  => $data['body_html'] ?? null,
+        //         'price'        => $product->price,
+        //         'currency'     => $data['variants'][0]['currency'] ?? $data['currency'] ?? 'USD',
+        //         'stock'        => $product->stock,
+        //         'vendor'       => $data['vendor'] ?? null,
+        //         'product_type' => $data['product_type'] ?? null,
+        //         'status'       => $product->status,
+
+        //         // ✅ Variants list
+        //         'variants' => collect($data['variants'] ?? [])->map(function ($variant) {
+        //             return [
+        //                 'sku'    => $variant['sku'] ?? null,
+        //                 'option' => implode(' / ', array_filter([
+        //                     $variant['option1'] ?? null,
+        //                     $variant['option2'] ?? null,
+        //                     $variant['option3'] ?? null,
+        //                 ])),
+        //                 'price'  => $variant['price'] ?? 0,
+        //                 'stock'  => $variant['inventory_quantity'] ?? 0,
+        //             ];
+        //         })->values()->toArray(),
+
+        //         // ✅ Images list
+        //         'images' => collect($data['images'] ?? [])->pluck('src')->values()->toArray(),
+        //     ],
+        // ];
+
         $response = Http::withHeaders([
             'X-Shopify-Access-Token' => $shop->access_token,
         ])->post("https://{$shop->shop_domain}/admin/api/2025-01/products.json", $payload);
 
         $result = $response->json();
 
-        // Save mapping
+        // ✅ Save mapping in local DB
         if (isset($result['product'])) {
             ShopifyProduct::updateOrCreate(
-                ['sku' => $data['sku'], 'shop_id' => $shop->id],
+                ['sku' => $data['sku'] ?? ($data['variants'][0]['sku'] ?? null), 'shop_id' => $shop->id],
                 [
-                    'erp_product_id' => $data['id'],
-                    'shopify_product_id' => $result['product']['id'],
-                    'shopify_variant_id' => $result['product']['variants'][0]['id'] ?? null,
-                    'inventory_item_id' => $result['product']['variants'][0]['inventory_item_id'] ?? null,
-                    'synced_at' => now(),
+                    'erp_product_id'      => $data['id'] ?? null,
+                    'shopify_product_id'  => $result['product']['id'],
+                    'shopify_variant_id'  => $result['product']['variants'][0]['id'] ?? null,
+                    'inventory_item_id'   => $result['product']['variants'][0]['inventory_item_id'] ?? null,
+                    'title'               => $result['product']['title'],
+                    'price'               => $result['product']['variants'][0]['price'] ?? 0,
+                    'stock'               => $result['product']['variants'][0]['inventory_quantity'] ?? 0,
+                    'status'              => $result['product']['status'] ?? 'active',
+                    'synced_at'           => now(),
                 ]
             );
         }
 
-        return $result;
+        return response()->json([
+            'success' => $response->successful(),
+            'shopify_response' => $result,
+        ], $response->status());
     }
 }
