@@ -14,6 +14,14 @@ class ProductSyncController extends Controller
     public function syncProduct(Request $request)
     {
         try {
+            $token = $request->bearerToken();
+
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Missing Bearer token'
+                ], 401);
+            }
             // Validate the request manually using the same rules from ProductSyncRequest
             $validated = $request->validate([
                 'product.id' => 'nullable|integer',
@@ -34,7 +42,7 @@ class ProductSyncController extends Controller
             ]);
 
             $data = $validated['product'];
-            $shop = ShopifyShop::first(); // TODO: map ERP → correct shop
+            $shop = ShopifyShop::where('erp_secret', $token)->first();
 
             // ✅ Find existing product by SKU (and shop)
             $existingProduct = ShopifyProduct::where('erp_product_id', $data['id'])
