@@ -13,6 +13,7 @@ class ProductSyncController extends Controller
 {
     public function syncProduct(Request $request)
     {
+        return $request;
         try {
             // Validate the request manually using the same rules from ProductSyncRequest
             $validated = $request->validate([
