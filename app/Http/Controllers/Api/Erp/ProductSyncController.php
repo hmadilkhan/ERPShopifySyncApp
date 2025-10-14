@@ -15,7 +15,25 @@ class ProductSyncController extends Controller
     {
         \Log::info('ERP Product Sync Controller reached!', $request->all());
 
-        $data = $request->validated()['product'];
+        // Validate the request manually since we're not using FormRequest
+        $validated = $request->validate([
+            'product.sku' => 'required|string',
+            'product.title' => 'required|string',
+            'product.description' => 'nullable|string',
+            'product.price' => 'required|numeric|min:0',
+            'product.currency' => 'required|string|size:3',
+            'product.stock' => 'required|integer|min:0',
+            'product.vendor' => 'nullable|string',
+            'product.product_type' => 'nullable|string',
+            'product.status' => 'required|in:active,draft,archived',
+            'product.variants.*.sku' => 'nullable|string',
+            'product.variants.*.option' => 'nullable|string',
+            'product.variants.*.price' => 'numeric',
+            'product.variants.*.stock' => 'integer|min:0',
+            'product.images.*' => 'url'
+        ]);
+        
+        $data = $validated['product'];
         $shop = ShopifyShop::first(); // TODO: map ERP → correct shop
 
         $payload = [
