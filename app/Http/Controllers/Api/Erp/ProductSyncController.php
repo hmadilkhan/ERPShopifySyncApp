@@ -13,10 +13,10 @@ class ProductSyncController extends Controller
 {
     public function syncProduct(Request $request)
     {
-        return $request;
         try {
             // Validate the request manually using the same rules from ProductSyncRequest
             $validated = $request->validate([
+                'product.id' => 'nullable|integer',
                 'product.sku' => 'required|string',
                 'product.title' => 'required|string',
                 'product.description' => 'nullable|string',
@@ -56,38 +56,6 @@ class ProductSyncController extends Controller
                     "images" => array_map(fn($img) => ["src" => $img], $data['images'] ?? [])
                 ]
             ];
-
-            //  // ✅ Build ERP payload
-            //  $payload = [
-            //     'product' => [
-            //         'sku'          => $product->sku,
-            //         'title'        => $product->title,
-            //         'description'  => $data['body_html'] ?? null,
-            //         'price'        => $product->price,
-            //         'currency'     => $data['variants'][0]['currency'] ?? $data['currency'] ?? 'USD',
-            //         'stock'        => $product->stock,
-            //         'vendor'       => $data['vendor'] ?? null,
-            //         'product_type' => $data['product_type'] ?? null,
-            //         'status'       => $product->status,
-
-            //         // ✅ Variants list
-            //         'variants' => collect($data['variants'] ?? [])->map(function ($variant) {
-            //             return [
-            //                 'sku'    => $variant['sku'] ?? null,
-            //                 'option' => implode(' / ', array_filter([
-            //                     $variant['option1'] ?? null,
-            //                     $variant['option2'] ?? null,
-            //                     $variant['option3'] ?? null,
-            //                 ])),
-            //                 'price'  => $variant['price'] ?? 0,
-            //                 'stock'  => $variant['inventory_quantity'] ?? 0,
-            //             ];
-            //         })->values()->toArray(),
-
-            //         // ✅ Images list
-            //         'images' => collect($data['images'] ?? [])->pluck('src')->values()->toArray(),
-            //     ],
-            // ];
 
             $response = Http::withHeaders([
                 'X-Shopify-Access-Token' => $shop->access_token,
