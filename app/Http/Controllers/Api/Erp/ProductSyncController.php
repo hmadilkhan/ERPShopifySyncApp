@@ -7,12 +7,14 @@ use App\Http\Requests\Erp\ProductSyncRequest;
 use App\Models\ShopifyShop;
 use App\Models\ShopifyProduct;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Request;
 
 class ProductSyncController extends Controller
 {
-    public function syncProduct(ProductSyncRequest $request)
+    public function syncProduct(Request $request)
     {
         \Log::info('ERP Product Sync Controller reached!', $request->all());
+
         $data = $request->validated()['product'];
         $shop = ShopifyShop::first(); // TODO: map ERP → correct shop
 
