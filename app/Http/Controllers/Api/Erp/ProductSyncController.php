@@ -11,12 +11,9 @@ use Illuminate\Http\Request;
 
 class ProductSyncController extends Controller
 {
-    public function syncProduct(ProductSyncRequest $request)
+    public function syncProduct(Request $request)
     {
-        return $request;
-        \Log::info('ERP Product Sync Controller reached!', $request->all());
-
-        // Validate the request manually since we're not using FormRequest
+        // Validate the request manually using the same rules from ProductSyncRequest
         $validated = $request->validate([
             'product.sku' => 'required|string',
             'product.title' => 'required|string',
