@@ -35,6 +35,13 @@ class ProductSyncController extends Controller
 
             $data = $validated['product'];
             $shop = ShopifyShop::first(); // TODO: map ERP → correct shop
+
+            // ✅ Find existing product by SKU (and shop)
+            $existingProduct = ShopifyProduct::where('sku', $data['sku'])
+                ->where('shop_id', $shop->id)
+                ->first();
+
+
             $payload = [
                 "product" => [
                     "title" => $data['title'],
@@ -57,9 +64,19 @@ class ProductSyncController extends Controller
                 ]
             ];
 
-            $response = Http::withHeaders([
-                'X-Shopify-Access-Token' => $shop->access_token,
-            ])->post("https://{$shop->shop_domain}/admin/api/2025-01/products.json", $payload);
+            // ✅ Choose CREATE or UPDATE endpoint
+            if ($existingProduct && $existingProduct->shopify_product_id) {
+                // 🔁 Update existing Shopify product
+                $shopifyUrl = "https://{$shop->shop_domain}/admin/api/2025-01/products/{$existingProduct->shopify_product_id}.json";
+                $response = Http::withHeaders([
+                    'X-Shopify-Access-Token' => $shop->access_token,
+                ])->put($shopifyUrl, $payload);
+            } else {
+
+                $response = Http::withHeaders([
+                    'X-Shopify-Access-Token' => $shop->access_token,
+                ])->post("https://{$shop->shop_domain}/admin/api/2025-01/products.json", $payload);
+            }
 
             $result = $response->json();
 
@@ -95,7 +112,7 @@ class ProductSyncController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred'.$e->getMessage(),
+                'message' => 'An error occurred' . $e->getMessage(),
                 'error' => $e->getMessage()
             ], 500);
         }
