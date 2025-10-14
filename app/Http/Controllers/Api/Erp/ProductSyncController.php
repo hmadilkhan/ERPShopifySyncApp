@@ -50,27 +50,71 @@ class ProductSyncController extends Controller
                 ->first();
 
 
+            // $payload = [
+            //     "product" => [
+            //         "title" => $data['title'],
+            //         "body_html" => $data['description'] ?? '',
+            //         "vendor" => $data['vendor'] ?? 'ERP',
+            //         "price" => $data['price'],
+            //         "currency" => $data['currency'],
+            //         "stock" => $data['stock'],
+            //         "product_type" => $data['product_type'] ?? '',
+            //         "status" => $data['status'],
+            //         "variants" => collect($data['variants'] ?? [])->map(function ($variant) {
+            //             return [
+            //                 "sku" => $variant['sku'] ?? null,
+            //                 "option1" => $variant['option'] ?? 'Default',
+            //                 "price" => $variant['price'] ?? null,
+            //                 "inventory_quantity" => $variant['stock'] ?? 0,
+            //             ];
+            //         })->values()->toArray(),
+            //         "images" => array_map(fn($img) => ["src" => $img], $data['images'] ?? [])
+            //     ]
+            // ];
+
             $payload = [
-                "product" => [
-                    "title" => $data['title'],
-                    "body_html" => $data['description'] ?? '',
-                    "vendor" => $data['vendor'] ?? 'ERP',
-                    "price" => $data['price'],
-                    "currency" => $data['currency'],
-                    "stock" => $data['stock'],
-                    "product_type" => $data['product_type'] ?? '',
-                    "status" => $data['status'],
-                    "variants" => collect($data['variants'] ?? [])->map(function ($variant) {
-                        return [
-                            "sku" => $variant['sku'] ?? null,
-                            "option1" => $variant['option'] ?? 'Default',
-                            "price" => $variant['price'] ?? null,
-                            "inventory_quantity" => $variant['stock'] ?? 0,
-                        ];
-                    })->values()->toArray(),
-                    "images" => array_map(fn($img) => ["src" => $img], $data['images'] ?? [])
-                ]
+                'product' => [
+                    'title'         => $data['title'],
+                    'body_html'     => $data['description'] ?? '',
+                    'vendor'        => $data['vendor'] ?? 'ERP',
+                    'price'         => $data['price'],
+                    'currency'      => $data['currency'],
+                    'stock'         => $data['stock'],
+                    'product_type'  => $data['product_type'] ?? '',
+                    'status'        => $data['status'],
+                    'images'        => array_map(fn($img) => ['src' => $img], $data['images'] ?? []),
+                ],
             ];
+
+            // ✅ Include product ID only if updating
+            if (!empty($data['id'])) {
+                $payload['product']['id'] = $data['id'];
+            }
+
+            // ✅ Only include variants if not empty
+            if (!empty($data['variants'])) {
+                $payload['product']['variants'] = collect($data['variants'])
+                    ->filter(function ($variant) {
+                        return !empty($variant['sku']);
+                    })
+                    ->map(function ($variant) {
+                        $variantPayload = [
+                            'sku'                 => $variant['sku'] ?? null,
+                            'option1'             => $variant['option'] ?? 'Default',
+                            'price'               => $variant['price'] ?? 0,
+                            'inventory_quantity'  => (int)($variant['stock'] ?? 0),
+                        ];
+
+                        // ✅ Include variant ID if exists (for updates)
+                        if (!empty($variant['shopify_variant_id'])) {
+                            $variantPayload['id'] = $variant['shopify_variant_id'];
+                        }
+
+                        return $variantPayload;
+                    })
+                    ->values()
+                    ->toArray();
+            }
 
             // ✅ Choose CREATE or UPDATE endpoint
             if ($existingProduct && $existingProduct->shopify_product_id) {
@@ -120,7 +164,7 @@ class ProductSyncController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred' . $e->getMessage(),
+                'message' => 'An error occurred',
                 'error' => $e->getMessage()
             ], 500);
         }
