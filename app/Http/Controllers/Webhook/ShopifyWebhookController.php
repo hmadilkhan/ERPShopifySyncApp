@@ -224,19 +224,51 @@ class ShopifyWebhookController extends Controller
         );
 
         // Transform contract
+        // $payload = [
+        //     "product_id" => $data['id'],
+        //     "sku"        => $product->sku,
+        //     "title"      => $product->title,
+        //     "status"     => $product->status,
+        //     "price"      => $product->price,
+        //     "currency"   => $data['currency'] ?? null, // safer: pull from order/shop not variant
+        //     "stock"      => $product->stock,
+        //     "shop" => [
+        //         "domain"  => $request->header('X-Shopify-Shop-Domain'),
+        //         "shop_id" => $product->shop_id,
+        //     ],
+        //     "synced_at" => now()->toISOString(),
+        // ];
+
+        // ✅ Build ERP payload
         $payload = [
-            "product_id" => $data['id'],
-            "sku"        => $product->sku,
-            "title"      => $product->title,
-            "status"     => $product->status,
-            "price"      => $product->price,
-            "currency"   => $data['currency'] ?? null, // safer: pull from order/shop not variant
-            "stock"      => $product->stock,
-            "shop" => [
-                "domain"  => $request->header('X-Shopify-Shop-Domain'),
-                "shop_id" => $product->shop_id,
+            'product' => [
+                'sku'          => $product->sku,
+                'title'        => $product->title,
+                'description'  => $data['body_html'] ?? null,
+                'price'        => $product->price,
+                'currency'     => $data['variants'][0]['currency'] ?? $data['currency'] ?? 'USD',
+                'stock'        => $product->stock,
+                'vendor'       => $data['vendor'] ?? null,
+                'product_type' => $data['product_type'] ?? null,
+                'status'       => $product->status,
+
+                // ✅ Variants list
+                'variants' => collect($data['variants'] ?? [])->map(function ($variant) {
+                    return [
+                        'sku'    => $variant['sku'] ?? null,
+                        'option' => implode(' / ', array_filter([
+                            $variant['option1'] ?? null,
+                            $variant['option2'] ?? null,
+                            $variant['option3'] ?? null,
+                        ])),
+                        'price'  => $variant['price'] ?? 0,
+                        'stock'  => $variant['inventory_quantity'] ?? 0,
+                    ];
+                })->values()->toArray(),
+
+                // ✅ Images list
+                'images' => collect($data['images'] ?? [])->pluck('src')->values()->toArray(),
             ],
-            "synced_at" => now()->toISOString(),
         ];
 
         // Forward to ERP
