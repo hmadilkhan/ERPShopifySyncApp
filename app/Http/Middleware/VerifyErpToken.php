@@ -23,7 +23,7 @@ class VerifyErpToken
         }
 
         $token = $matches[1];
-
+        \Log::info($token);
         // 🔎 Check token in database
         $shop = ShopifyShop::where('erp_secret', $token)->first();
 
