@@ -26,7 +26,7 @@ class VerifyErpToken
         \Log::info($token);
         // 🔎 Check token in database
         $shop = ShopifyShop::where('erp_secret', $token)->first();
-
+        \Log::info($shop);
         if (!$shop) {
             return response()->json(['error' => 'Unauthorized ERP request'], 401);
         }
