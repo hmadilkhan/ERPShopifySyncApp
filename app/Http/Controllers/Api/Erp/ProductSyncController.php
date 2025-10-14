@@ -13,7 +13,7 @@ class ProductSyncController extends Controller
 {
     public function syncProduct(Request $request)
     {
-        return $request;
+        
         // Validate the request manually using the same rules from ProductSyncRequest
         $validated = $request->validate([
             'product.sku' => 'required|string',
@@ -34,7 +34,7 @@ class ProductSyncController extends Controller
         
         $data = $validated['product'];
         $shop = ShopifyShop::first(); // TODO: map ERP → correct shop
-
+        return $request;
         $payload = [
             "product" => [
                 "title" => $data['title'],
