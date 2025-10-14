@@ -8,7 +8,8 @@ use App\Http\Controllers\Webhook\ShopifyWebhookController;
 
 // Group ERP routes
 Route::prefix('erp')->middleware('auth.erp')->group(function () {
-    Route::post('/products/sync', [ProductSyncController::class, 'syncProduct']);
+    // Route::post('/products/sync', [ProductSyncController::class, 'syncProduct']);
+    Route::post('/products/sync', [\App\Http\Controllers\Api\Erp\ProductSyncController::class, 'syncProduct']);
     Route::post('/stock-updated', [StockSyncController::class, 'updateStock']);
     Route::post('/orders/update-status', [OrderSyncController::class, 'updateOrderStatus']);
 });
