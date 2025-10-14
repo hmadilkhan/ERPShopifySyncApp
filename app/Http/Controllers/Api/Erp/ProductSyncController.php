@@ -37,7 +37,7 @@ class ProductSyncController extends Controller
             $shop = ShopifyShop::first(); // TODO: map ERP → correct shop
 
             // ✅ Find existing product by SKU (and shop)
-            $existingProduct = ShopifyProduct::where('sku', $data['sku'])
+            $existingProduct = ShopifyProduct::where('erp_product_id', $data['id'])
                 ->where('shop_id', $shop->id)
                 ->first();
 
