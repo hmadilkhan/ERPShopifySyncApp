@@ -126,7 +126,7 @@ class ProductSyncController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred',
+                'message' => 'An error occurred'.$e->getMessage(),
                 'error' => $e->getMessage()
             ], 500);
         }
