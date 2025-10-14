@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 
 class ProductSyncController extends Controller
 {
-    public function syncProduct(Request $request)
+    public function syncProduct(ProductSyncRequest $request)
     {
         return $request;
         \Log::info('ERP Product Sync Controller reached!', $request->all());
