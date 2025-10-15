@@ -171,6 +171,9 @@ class ProductSyncController extends Controller
 
             $result = $response->json();
 
+            // ✅ Determine if this is create or update
+            $isNewProduct = !$existingProduct || !$existingProduct->shopify_product_id;
+
             // ✅ Save mapping in local DB
             if (isset($result['product'])) {
                 ShopifyProduct::updateOrCreate(
@@ -200,6 +203,18 @@ class ProductSyncController extends Controller
                     $locationId = $locationResponse->json('locations')[0]['id'] ?? null;
 
                     if ($locationId) {
+                        // 🧩 STEP 1: CONNECT only if NEW product
+                        if ($isNewProduct) {
+                            Http::withHeaders([
+                                'X-Shopify-Access-Token' => $shop->access_token,
+                                'Content-Type' => 'application/json',
+                            ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/connect.json", [
+                                'location_id' => $locationId,
+                                'inventory_item_id' => $productData['variants'][0]['inventory_item_id'],
+                                'relocate_if_necessary' => true,
+                            ]);
+                        }
+
                         Http::withHeaders([
                             'X-Shopify-Access-Token' => $shop->access_token,
                         ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/set.json", [
