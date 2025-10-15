@@ -124,6 +124,8 @@ class ProductSyncController extends Controller
                             'option1'             => $variant['option'] ?? 'Default Title',
                             'price'               => $variant['price'] ?? 0,
                             'inventory_quantity'  => (int)($variant['stock'] ?? 0),
+                            'inventory_management' => 'shopify',  // ✅ Enables tracking
+                            'inventory_policy'    => 'deny',     // Optional: prevent overselling
                         ];
 
                         if (!empty($variant['shopify_variant_id'])) {
@@ -141,6 +143,8 @@ class ProductSyncController extends Controller
                     'option1'             => 'Default Title',
                     'price'               => $data['price'] ?? 0,
                     'inventory_quantity'  => (int)($data['stock'] ?? 0),
+                    'inventory_management' => 'shopify',  // ✅ Enables tracking
+                    'inventory_policy'    => 'deny',     // Optional: prevent overselling
                 ];
 
                 // Include variant ID if exists (update)
@@ -184,24 +188,27 @@ class ProductSyncController extends Controller
                     ]
                 );
 
+                // 🧾 Get the created or updated product data
+                $productData = $response->json('product');
+
                 // 🔹 Optional: Sync inventory via API (more reliable for updates)
-                // if (!empty($productData['variants'][0]['inventory_item_id'])) {
-                //     $locationResponse = Http::withHeaders([
-                //         'X-Shopify-Access-Token' => $shop->access_token,
-                //     ])->get("https://{$shop->shop_domain}/admin/api/2025-01/locations.json");
+                if (!empty($productData['variants'][0]['inventory_item_id'])) {
+                    $locationResponse = Http::withHeaders([
+                        'X-Shopify-Access-Token' => $shop->access_token,
+                    ])->get("https://{$shop->shop_domain}/admin/api/2025-01/locations.json");
 
-                //     $locationId = $locationResponse->json('locations')[0]['id'] ?? null;
+                    $locationId = $locationResponse->json('locations')[0]['id'] ?? null;
 
-                //     if ($locationId) {
-                //         Http::withHeaders([
-                //             'X-Shopify-Access-Token' => $shop->access_token,
-                //         ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/set.json", [
-                //             'location_id'       => $locationId,
-                //             'inventory_item_id' => $productData['variants'][0]['inventory_item_id'],
-                //             'available'         => (int)($data['stock'] ?? 0),
-                //         ]);
-                //     }
-                // }
+                    if ($locationId) {
+                        Http::withHeaders([
+                            'X-Shopify-Access-Token' => $shop->access_token,
+                        ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/set.json", [
+                            'location_id'       => $locationId,
+                            'inventory_item_id' => $productData['variants'][0]['inventory_item_id'],
+                            'available'         => (int)($data['stock'] ?? 0),
+                        ]);
+                    }
+                }
             }
 
             return response()->json([
