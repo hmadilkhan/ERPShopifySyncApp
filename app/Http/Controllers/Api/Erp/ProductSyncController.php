@@ -77,7 +77,7 @@ class ProductSyncController extends Controller
                     'title'         => $data['title'],
                     'body_html'     => $data['description'] ?? '',
                     'vendor'        => $data['vendor'] ?? 'ERP',
-                    'price'         => $data['price'],
+                    'price'         => number_format($data['price']),
                     'currency'      => $data['currency'],
                     'stock'         => $data['stock'],
                     'product_type'  => $data['product_type'] ?? '',
