@@ -146,33 +146,37 @@ class OrderSyncController extends Controller
 
                         // Step 3: Create fulfillment with fulfillmentOrderId (required)
                         $mutation = <<<GQL
-                        mutation FulfillOrder(\$input: FulfillmentCreateV2Input!) {
-                            fulfillmentCreateV2(input: \$input) {
+                            mutation FulfillOrder(\$fulfillment: FulfillmentCreateV3Input!) {
+                            fulfillmentCreateV3(fulfillment: \$fulfillment) {
                                 fulfillment {
-                                    id
-                                    status
-                                    trackingInfo {
-                                        number
-                                        company
-                                        url
-                                    }
+                                id
+                                status
+                                trackingInfo {
+                                    number
+                                    company
+                                    url
+                                }
                                 }
                                 userErrors {
-                                    field
-                                    message
+                                field
+                                message
                                 }
                             }
-                        }
-                        GQL;
+                            }
+                            GQL;
 
                         $variables = [
-                            'input' => [
-                                'fulfillmentOrderId' => $fulfillmentOrderId,
-                                'fulfillmentOrderLineItems' => $lineItemInputs,
+                            'fulfillment' => [
+                                'lineItemsByFulfillmentOrder' => [
+                                    [
+                                        'fulfillmentOrderId' => $fulfillmentOrderId,
+                                        'fulfillmentOrderLineItems' => $lineItemInputs,
+                                    ],
+                                ],
                                 'trackingInfo' => [
-                                    'number' => $data['tracking_number'] ?? null,
+                                    'number'  => $data['tracking_number'] ?? null,
                                     'company' => $data['tracking_company'] ?? 'ERP Logistics',
-                                    'url' => $data['tracking_url'] ?? null,
+                                    'url'     => $data['tracking_url'] ?? null,
                                 ],
                                 'notifyCustomer' => $data['notify_customer'] ?? true,
                             ],
@@ -187,11 +191,11 @@ class OrderSyncController extends Controller
 
                         \Log::info('🟢 Fulfillment GraphQL Response', $fulfillResult);
 
-                        if (isset($fulfillResult['data']['fulfillmentCreateV2']['userErrors'][0])) {
+                        if (isset($fulfillResult['data']['fulfillmentCreateV3']['userErrors'][0])) {
                             return response()->json([
                                 'success' => false,
                                 'message' => 'Shopify returned errors while fulfilling',
-                                'errors' => $fulfillResult['data']['fulfillmentCreateV2']['userErrors'],
+                                'errors' => $fulfillResult['data']['fulfillmentCreateV3']['userErrors'],
                             ], 422);
                         }
 
