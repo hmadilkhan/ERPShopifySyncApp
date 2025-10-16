@@ -146,8 +146,8 @@ class OrderSyncController extends Controller
 
                         // Step 3: Create fulfillment with fulfillmentOrderId (required)
                         $mutation = <<<GQL
-                            mutation FulfillOrder(\$fulfillment: FulfillmentCreateV3Input!) {
-                            fulfillmentCreateV3(fulfillment: \$fulfillment) {
+                            mutation FulfillOrder(\$fulfillment: FulfillmentInput!) {
+                            fulfillmentCreate(fulfillment: \$fulfillment) {
                                 fulfillment {
                                 id
                                 status
@@ -164,7 +164,7 @@ class OrderSyncController extends Controller
                             }
                             }
                             GQL;
-
+                    
                         $variables = [
                             'fulfillment' => [
                                 'lineItemsByFulfillmentOrder' => [
