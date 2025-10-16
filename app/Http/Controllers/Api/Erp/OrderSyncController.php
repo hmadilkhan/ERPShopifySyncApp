@@ -7,6 +7,7 @@ use App\Models\ShopifyOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use App\Models\ShopifyShop;
+use Exception;
 use Illuminate\Support\Facades\Log;
 
 class OrderSyncController extends Controller
@@ -70,7 +71,134 @@ class OrderSyncController extends Controller
                         $orderGid = "gid://shopify/Order/{$orderId}";
                         $graphqlUrl = "https://{$shopDomain}/admin/api/2025-01/graphql.json";
 
-                        // Step 1: Fetch fulfillment orders
+                        /**
+                         * STEP 1: Capture Payment if applicable
+                         */
+                        try {
+                            // 🔹 Fetch order transactions
+                            $transactionQuery = <<<GQL
+                                query GetOrderTransactions(\$orderId: ID!) {
+                                    order(id: \$orderId) {
+                                        id
+                                        name
+                                        transactions(first: 10) {
+                                            edges {
+                                                node {
+                                                    id
+                                                    kind
+                                                    status
+                                                    amountSet {
+                                                        presentmentMoney {
+                                                            amount
+                                                            currencyCode
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            GQL;
+
+                            $txnResp = Http::withHeaders($headers)->post($graphqlUrl, [
+                                'query' => $transactionQuery,
+                                'variables' => ['orderId' => $orderGid],
+                            ])->json();
+
+                            $transactions = $txnResp['data']['order']['transactions']['edges'] ?? [];
+
+                            $authTxn = collect($transactions)->first(fn($edge) => $edge['node']['kind'] === 'AUTHORIZATION');
+
+                            if ($authTxn) {
+                                \Log::info("🧾 Authorized transaction found, capturing payment...");
+
+                                $parentTransactionId = $authTxn['node']['id'];
+                                $amount = $authTxn['node']['amountSet']['presentmentMoney']['amount'];
+                                $currency = $authTxn['node']['amountSet']['presentmentMoney']['currencyCode'];
+
+                                $captureMutation = <<<GQL
+                                    mutation CapturePayment(\$input: OrderCaptureInput!) {
+                                        orderCapture(input: \$input) {
+                                            transaction {
+                                                id
+                                                kind
+                                                status
+                                                amountSet {
+                                                    presentmentMoney {
+                                                        amount
+                                                        currencyCode
+                                                    }
+                                                }
+                                            }
+                                            userErrors {
+                                                field
+                                                message
+                                            }
+                                        }
+                                    }
+                                GQL;
+
+                                $captureVars = [
+                                    'input' => [
+                                        'id' => $orderGid,
+                                        'parentTransactionId' => $parentTransactionId,
+                                        'amount' => $amount,
+                                        'currency' => $currency,
+                                    ],
+                                ];
+
+                                $captureResp = Http::withHeaders($headers)->post($graphqlUrl, [
+                                    'query' => $captureMutation,
+                                    'variables' => $captureVars,
+                                ])->json();
+
+                                \Log::info("💰 orderCapture response", $captureResp);
+
+                                if (!empty($captureResp['data']['orderCapture']['userErrors'])) {
+                                    \Log::warning("⚠️ Capture failed, will try markAsPaid fallback.", $captureResp);
+                                    throw new Exception('Capture failed');
+                                }
+
+                                \Log::info("✅ Payment captured successfully for order {$orderId}");
+                            } else {
+                                // 🔹 No authorization found → mark as paid
+                                \Log::info("No authorized transaction found, marking order as paid...");
+
+                                $markPaidMutation = <<<GQL
+                                    mutation MarkAsPaid(\$input: OrderMarkAsPaidInput!) {
+                                        orderMarkAsPaid(input: \$input) {
+                                            order {
+                                                id
+                                                displayFinancialStatus
+                                            }
+                                            userErrors {
+                                                field
+                                                message
+                                            }
+                                        }
+                                    }
+                                GQL;
+
+                                $markVars = ['input' => ['id' => $orderGid]];
+
+                                $markResp = Http::withHeaders($headers)->post($graphqlUrl, [
+                                    'query' => $markPaidMutation,
+                                    'variables' => $markVars,
+                                ])->json();
+
+                                \Log::info("💵 orderMarkAsPaid response", $markResp);
+
+                                if (!empty($markResp['data']['orderMarkAsPaid']['userErrors'])) {
+                                    throw new Exception('Mark as paid failed');
+                                }
+
+                                \Log::info("✅ Order {$orderId} marked as paid successfully.");
+                            }
+                        } catch (Exception $e) {
+                            \Log::error("❌ Payment handling failed for {$orderId}: " . $e->getMessage());
+                        }
+
+                        // Step 2: Fetch fulfillment orders
                         $query = <<<GQL
                             query GetFulfillmentOrders(\$orderId: ID!) {
                                 order(id: \$orderId) {
@@ -164,7 +292,7 @@ class OrderSyncController extends Controller
                             }
                             }
                             GQL;
-                    
+
                         $variables = [
                             'fulfillment' => [
                                 'lineItemsByFulfillmentOrder' => [
