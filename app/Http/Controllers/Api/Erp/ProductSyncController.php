@@ -38,7 +38,8 @@ class ProductSyncController extends Controller
                 'product.variants.*.option' => 'nullable|string',
                 'product.variants.*.price' => 'numeric',
                 'product.variants.*.stock' => 'integer|min:0',
-                'product.images.*' => 'url'
+                // 'product.images.*' => 'url'
+                'product.images.*.src' => 'url',
             ]);
 
             $data = $validated['product'];
