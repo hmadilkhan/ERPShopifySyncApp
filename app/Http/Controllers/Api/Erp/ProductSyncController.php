@@ -128,6 +128,14 @@ class ProductSyncController extends Controller
                             'inventory_policy'    => 'deny',     // Optional: prevent overselling
                         ];
 
+                        // ✅ Include image if provided
+                        if (!empty($variant['image'])) {
+                            // Shopify expects an object with src
+                            $variantPayload['image'] = [
+                                'src' => $variant['image'],
+                            ];
+                        }
+
                         if (!empty($variant['shopify_variant_id'])) {
                             $variantPayload['id'] = $variant['shopify_variant_id'];
                         }
@@ -146,6 +154,13 @@ class ProductSyncController extends Controller
                     'inventory_management' => 'shopify',  // ✅ Enables tracking
                     'inventory_policy'    => 'deny',     // Optional: prevent overselling
                 ];
+
+                // ✅ Single variant image if exists
+                if (!empty($data['image'])) {
+                    $variant['image'] = [
+                        'src' => $data['image'],
+                    ];
+                }
 
                 // Include variant ID if exists (update)
                 if (!empty($data['shopify_variant_id'])) {
