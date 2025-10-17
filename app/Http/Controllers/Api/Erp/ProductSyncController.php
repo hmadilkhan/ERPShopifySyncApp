@@ -265,9 +265,8 @@ class ProductSyncController extends Controller
 
     private function updateImagesToVariant($syncResponse, $shop)
     {
-        // Assuming you already have these:
         $payload = $syncResponse['payload'];     // ERP product payload
-        $shopifyResponse = $syncResponse['data']; // Shopify API response (after product created)
+        $shopifyResponse = $syncResponse['data']; // Shopify API response after product creation
         $product = $shopifyResponse['product'] ?? null;
 
         if (!$product) {
@@ -275,30 +274,54 @@ class ProductSyncController extends Controller
             return;
         }
 
-        $images   = $product['images'] ?? [];
-        $variants = $product['variants'] ?? [];
         $erpVariants = $payload['product']['variants'] ?? [];
+        $productId   = $product['id'];
 
-        // 1️⃣ Build map of image src → Shopify image_id
+        // 🕒 Retry up to 5 times (wait between each try) to ensure image IDs are ready
+        $maxAttempts = 5;
+        $attempt = 1;
+        $images = [];
+
+        do {
+            $response = Http::withHeaders([
+                'X-Shopify-Access-Token' => $shop->access_token,
+            ])->get("https://{$shop->shop_domain}/admin/api/2025-01/products/{$productId}.json");
+
+            if ($response->successful()) {
+                $images = $response->json('product.images', []);
+                if (!empty($images)) break;
+            }
+
+            \Log::info("⏳ Waiting for Shopify images to be ready... (Attempt {$attempt})");
+            sleep(2);
+            $attempt++;
+        } while ($attempt <= $maxAttempts);
+
+        if (empty($images)) {
+            \Log::warning("⚠️ No images found for product {$productId} after {$maxAttempts} attempts.");
+            return;
+        }
+
+        // ✅ Build map of image src → Shopify image_id
         $imageMap = collect($images)->mapWithKeys(fn($img) => [$img['src'] => $img['id']]);
 
-        // 2️⃣ Loop Shopify variants and link their ERP image
+        $variants = $product['variants'] ?? [];
+
         foreach ($variants as $variant) {
-            // Find matching ERP variant by SKU
+            // Find ERP variant with matching SKU
             $erpVariant = collect($erpVariants)->firstWhere('sku', $variant['sku']);
             if (!$erpVariant || empty($erpVariant['image']['src'])) continue;
 
             $variantImageUrl = $erpVariant['image']['src'];
-
-            // Match ERP image URL to Shopify image_id
             $imageId = $imageMap[$variantImageUrl] ?? null;
+
             if (!$imageId) {
-                \Log::warning("⚠️ No Shopify image match found for variant {$variant['sku']} ($variantImageUrl)");
+                \Log::warning("⚠️ No matching Shopify image found for variant {$variant['sku']} ({$variantImageUrl})");
                 continue;
             }
 
-            // 3️⃣ Send request to link the image to the variant
-            Http::withHeaders([
+            // ✅ Link variant to image
+            $updateResponse = Http::withHeaders([
                 'X-Shopify-Access-Token' => $shop->access_token,
                 'Content-Type' => 'application/json',
             ])->put("https://{$shop->shop_domain}/admin/api/2025-01/variants/{$variant['id']}.json", [
@@ -308,7 +331,13 @@ class ProductSyncController extends Controller
                 ]
             ]);
 
-            \Log::info("✅ Linked variant {$variant['sku']} to Shopify image ID {$imageId}");
+            if ($updateResponse->successful()) {
+                \Log::info("✅ Linked variant {$variant['sku']} to image ID {$imageId}");
+            } else {
+                \Log::error("❌ Failed to link variant {$variant['sku']} to image {$imageId}", [
+                    'response' => $updateResponse->body(),
+                ]);
+            }
         }
     }
 
