@@ -272,6 +272,8 @@ class ProductSyncController extends Controller
 
             if (empty($erpPayload) || empty($shopifyProduct)) {
                 \Log::warning("⚠️ Missing ERP payload or Shopify product in sync response");
+                \Log::info($syncResponse);
+
                 return;
             }
 
