@@ -35,6 +35,7 @@ class ProductSyncController extends Controller
                 'product.vendor' => 'nullable|string',
                 'product.product_type' => 'nullable|string',
                 'product.status' => 'required|in:active,draft,archived',
+                'product.variants.*.id' => 'nullable|numeric',
                 'product.variants.*.sku' => 'nullable|string',
                 'product.variants.*.option' => 'nullable|string',
                 'product.variants.*.price' => 'numeric',
