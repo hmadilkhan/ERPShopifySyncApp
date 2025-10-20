@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Erp\ProductSyncRequest;
 use App\Models\ShopifyShop;
 use App\Models\ShopifyProduct;
+use App\Models\ShopifyProductVariant;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 
@@ -208,6 +209,29 @@ class ProductSyncController extends Controller
                     ]
                 );
 
+                if (isset($result['product']['variants']) && !empty($result['product']['variants'])) {
+                    foreach ($result['product']['variants'] as $index => $variantData) {
+                        $erpVariant = $data['variants'][$index] ?? null;
+
+                        ShopifyProductVariant::updateOrCreate(
+                            [
+                                'shopify_variant_id' => $variantData['id'],
+                                'shop_id' => $shop->id,
+                            ],
+                            [
+                                'shopify_product_id' => $result['product']['id'],
+                                'erp_variant_id' => $erpVariant['id'] ?? null, // ERP variant id if available
+                                'inventory_item_id' => $variantData['inventory_item_id'] ?? null,
+                                'sku'               => $variantData['sku'] ?? null,
+                                'title'             => $variantData['title'] ?? null,
+                                'price'             => $variantData['price'] ?? 0,
+                                'stock'             => $variantData['inventory_quantity'] ?? 0,
+                                'image_url'         => $erpVariant['image'] ?? null,
+                            ]
+                        );
+                    }
+                }
+
                 // 🧾 Get the created or updated product data
                 $productData = $response->json('product');
 
@@ -273,7 +297,6 @@ class ProductSyncController extends Controller
             if (empty($erpPayload) || empty($shopifyProduct)) {
                 \Log::warning("⚠️ Missing ERP payload or Shopify product in sync response");
                 \Log::info($syncResponse);
-
                 return;
             }
 
