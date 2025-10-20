@@ -102,8 +102,19 @@ class ShopifyWebhookController extends Controller
             ->toArray();
 
         // 🔄 Transform line items with mapped ERP product IDs
-        $lineItems = collect($data['line_items'] ?? [])->map(function ($item) use ($productMap) {
-            return [
+        // $lineItems = collect($data['line_items'] ?? [])->map(function ($item) use ($productMap) {
+        //     return [
+        //         'product_id' => $productMap[$item['product_id']] ?? $item['product_id'] ?? null, // ERP ID fallback to Shopify ID
+        //         'sku'        => $item['sku'] ?? null,
+        //         'title'      => $item['title'] ?? null,
+        //         'quantity'   => $item['quantity'] ?? 0,
+        //         'price'      => $item['price'] ?? 0,
+        //         'tax'        => collect($item['tax_lines'] ?? [])->sum('price') ?? 0,
+        //     ];
+        // })->values()->toArray();
+
+        $lineItems = collect($data['line_items'] ?? [])->flatMap(function ($item) use ($productMap) {
+            $base = [
                 'product_id' => $productMap[$item['product_id']] ?? $item['product_id'] ?? null, // ERP ID fallback to Shopify ID
                 'sku'        => $item['sku'] ?? null,
                 'title'      => $item['title'] ?? null,
@@ -111,8 +122,21 @@ class ShopifyWebhookController extends Controller
                 'price'      => $item['price'] ?? 0,
                 'tax'        => collect($item['tax_lines'] ?? [])->sum('price') ?? 0,
             ];
+        
+            // Start with the base product item
+            $items = [$base];
+        
+            // If variant title exists, add a second entry for the variant itself
+            if (!empty($item['variant_title'])) {
+                $variantItem = $base;
+                $variantItem['product_id'] = $item['variant_id'] ?? $base['product_id'];
+                $variantItem['title'] = $item['variant_title'] ?? $base['title'];
+                $items[] = $variantItem;
+            }
+        
+            return $items;
         })->values()->toArray();
-
+        
         return [
             'order_id'           => $data['id'],
             'name'               => $data['name'] ?? ('#' . ($data['order_number'] ?? 'N/A')),
@@ -124,19 +148,6 @@ class ShopifyWebhookController extends Controller
 
             // 🧾 Line Items Mapping
             'line_items' => $lineItems,
-            // 'line_items' => collect($data['line_items'] ?? [])->map(function ($item) {
-            //     // Fetch ERP Product ID using Shopify Product ID
-            //     $erpProductId = ShopifyProduct::where('shopify_product_id', $item['product_id'] ?? null)
-            //         ->value('erp_product_id');
-            //     return [
-            //         'product_id' => $erpProductId ?? $item['product_id'] ?? null,
-            //         'sku'        => $item['sku'] ?? null,
-            //         'title'      => $item['title'] ?? null,
-            //         'quantity'   => $item['quantity'] ?? 0,
-            //         'price'      => $item['price'] ?? 0,
-            //         'tax'        => collect($item['tax_lines'] ?? [])->sum('price') ?? 0,
-            //     ];
-            // })->values()->toArray(),
 
             // 👤 Customer Mapping
             'customer' => [
@@ -154,9 +165,6 @@ class ShopifyWebhookController extends Controller
                 'domain'  => $request->header('X-Shopify-Shop-Domain'),
                 'shop_id' => $order->shop_id ?? null,
             ],
-
-            // 🕒 Metadata
-            // 'synced_at' => now()->toISOString(),
         ];
     }
 
