@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Webhook;
 use App\Http\Controllers\Controller;
 use App\Models\ShopifyOrder;
 use App\Models\ShopifyProduct;
+use App\Models\ShopifyProductVariant;
 use App\Models\ShopifyShop;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -330,6 +331,7 @@ class ShopifyWebhookController extends Controller
             Log::info('🗑️ Shopify Product Deleted Webhook', ['payload' => $data]);
 
             ShopifyProduct::where('shopify_product_id', $data['id'])->delete();
+            ShopifyProductVariant::where('shopify_product_id', $data['id'])->delete();
 
             $this->forwardToErp($request, '/webhooks/product-deleted', [
                 'product_id' => $data['id'],
