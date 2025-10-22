@@ -237,7 +237,9 @@ class ProductSyncController extends Controller
                 $productData = $response->json('product');
 
                 // 🔹 Optional: Sync inventory via API (more reliable for updates)
-                if (!empty($productData['variants'][0]['inventory_item_id'])) {
+                if (!empty($productData['variants'])) {
+
+                    // Get location
                     $locationResponse = Http::withHeaders([
                         'X-Shopify-Access-Token' => $shop->access_token,
                     ])->get("https://{$shop->shop_domain}/admin/api/2025-01/locations.json");
@@ -245,25 +247,56 @@ class ProductSyncController extends Controller
                     $locationId = $locationResponse->json('locations')[0]['id'] ?? null;
 
                     if ($locationId) {
-                        // 🧩 STEP 1: CONNECT only if NEW product
-                        if ($isNewProduct) {
+                        foreach ($productData['variants'] as $variant) {
+                            $inventoryItemId = $variant['inventory_item_id'] ?? null;
+                            $variantId = $variant['id'] ?? null;
+
+                            if (!$inventoryItemId || !$variantId) {
+                                continue;
+                            }
+
+                            // 🧩 STEP 1: CONNECT only if NEW product
+                            if ($isNewProduct) {
+                                Http::withHeaders([
+                                    'X-Shopify-Access-Token' => $shop->access_token,
+                                    'Content-Type' => 'application/json',
+                                ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/connect.json", [
+                                    'location_id' => $locationId,
+                                    'inventory_item_id' => $inventoryItemId,
+                                    'relocate_if_necessary' => true,
+                                ]);
+                            }
+
+                            // 🧩 STEP 2: SET inventory (variant-specific if available)
+                            $variantStock = 0;
+
+                            if (!empty($data['variants']) && is_array($data['variants'])) {
+                                // Try to match variant by SKU or by ID if provided
+                                foreach ($data['variants'] as $inputVariant) {
+                                    if (
+                                        (isset($inputVariant['id']) && $inputVariant['id'] == $variantId) ||
+                                        (isset($inputVariant['sku']) && $inputVariant['sku'] == ($variant['sku'] ?? null))
+                                    ) {
+                                        $variantStock = (int)($inputVariant['stock'] ?? (int)$data["stock"]);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Fallback to main stock if variant stock not found
+                            if ($variantStock === 0 && isset($data['stock'])) {
+                                $variantStock = (int)$data['stock'];
+                            }
+
+                            // Update stock for this variant
                             Http::withHeaders([
                                 'X-Shopify-Access-Token' => $shop->access_token,
-                                'Content-Type' => 'application/json',
-                            ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/connect.json", [
-                                'location_id' => $locationId,
-                                'inventory_item_id' => $productData['variants'][0]['inventory_item_id'],
-                                'relocate_if_necessary' => true,
+                            ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/set.json", [
+                                'location_id'       => $locationId,
+                                'inventory_item_id' => $inventoryItemId,
+                                'available'         => $variantStock,
                             ]);
                         }
-
-                        Http::withHeaders([
-                            'X-Shopify-Access-Token' => $shop->access_token,
-                        ])->post("https://{$shop->shop_domain}/admin/api/2025-01/inventory_levels/set.json", [
-                            'location_id'       => $locationId,
-                            'inventory_item_id' => $productData['variants'][0]['inventory_item_id'],
-                            'available'         => (int)($data['stock'] ?? 0),
-                        ]);
                     }
                 }
             }
