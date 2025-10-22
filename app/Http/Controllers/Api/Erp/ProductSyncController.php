@@ -188,8 +188,8 @@ class ProductSyncController extends Controller
 
             $result = $response->json();
 
-            // $this->updateImagesToVariant($result, $shop);
-            $this->updateImagesToVariantGraphQL($result, $shop);
+            $this->updateImagesToVariant($result, $shop);
+            // $this->updateImagesToVariantGraphQL($result, $shop);
 
             // ✅ Determine if this is create or update
             $isNewProduct = !$existingProduct || !$existingProduct->shopify_product_id;
