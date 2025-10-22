@@ -188,7 +188,8 @@ class ProductSyncController extends Controller
 
             $result = $response->json();
 
-            $this->updateImagesToVariant($result, $shop);
+            // $this->updateImagesToVariant($result, $shop);
+            $this->updateImagesToVariantGraphQL($result, $shop);
 
             // ✅ Determine if this is create or update
             $isNewProduct = !$existingProduct || !$existingProduct->shopify_product_id;
@@ -409,6 +410,108 @@ class ProductSyncController extends Controller
             }
         } catch (\Throwable $e) {
             \Log::error("❌ Error in updateImagesToVariant: {$e->getMessage()}");
+        }
+    }
+
+    private function updateImagesToVariantGraphQL($syncResponse, $shop, $maxAttempts = 3, $delaySeconds = 3)
+    {
+        try {
+            $erpPayload     = $syncResponse['payload']['product'] ?? null;
+            $shopifyProduct = $syncResponse['data']['shopify_response']['product'] ?? null;
+
+            if (empty($erpPayload) || empty($shopifyProduct)) {
+                \Log::warning("⚠️ Missing ERP payload or Shopify product in sync response");
+                return;
+            }
+
+            $erpVariants     = $erpPayload['variants'] ?? [];
+            $shopifyVariants = $shopifyProduct['variants'] ?? [];
+
+            // Fetch latest product images (same as before)
+            $fetchUrl = "https://{$shop->shop_domain}/admin/api/2025-01/products/{$shopifyProduct['id']}.json";
+            $productResponse = Http::withHeaders([
+                'X-Shopify-Access-Token' => $shop->access_token,
+            ])->get($fetchUrl);
+
+            if (!$productResponse->successful()) {
+                \Log::error("❌ Failed to fetch Shopify product: " . $productResponse->body());
+                return;
+            }
+
+            $latestProduct = $productResponse->json('product');
+            $shopifyImages = $latestProduct['images'] ?? [];
+
+            // Create map of filename → mediaId (GraphQL uses global IDs, format: gid://shopify/MediaImage/{id})
+            $imageMap = collect($shopifyImages)->mapWithKeys(function ($img) {
+                $filename = basename(parse_url($img['src'], PHP_URL_PATH));
+                $mediaId = "gid://shopify/MediaImage/{$img['id']}";
+                return [$filename => $mediaId];
+            });
+
+            foreach ($shopifyVariants as $variant) {
+                $erpVariant = collect($erpVariants)->firstWhere('sku', $variant['sku']);
+
+                if (empty($erpVariant['image']['src'])) {
+                    \Log::warning("⚠️ ERP image missing for SKU {$variant['sku']}");
+                    continue;
+                }
+
+                $erpImageUrl = $erpVariant['image']['src'];
+                $erpFilename = basename(parse_url($erpImageUrl, PHP_URL_PATH));
+                $mediaId = $imageMap[$erpFilename] ?? null;
+
+                if (!$mediaId) {
+                    \Log::warning("⚠️ Media ID not found for SKU {$variant['sku']} ({$erpFilename})");
+                    continue;
+                }
+
+                // Shopify GraphQL uses GID for ProductVariant, format: gid://shopify/ProductVariant/{id}
+                $variantId = "gid://shopify/ProductVariant/{$variant['id']}";
+
+                $graphqlMutation = <<<'GRAPHQL'
+                                    mutation productVariantUpdate($input: ProductVariantInput!) {
+                                    productVariantUpdate(input: $input) {
+                                        productVariant {
+                                        id
+                                        }
+                                        userErrors {
+                                        field
+                                        message
+                                        }
+                                    }
+                                    }
+                                    GRAPHQL;
+
+                $graphqlPayload = [
+                    'query' => $graphqlMutation,
+                    'variables' => [
+                        'input' => [
+                            'id' => $variantId,
+                            'mediaId' => $mediaId,
+                        ],
+                    ],
+                ];
+
+                $graphqlUrl = "https://{$shop->shop_domain}/admin/api/2025-01/graphql.json";
+
+                $response = Http::withHeaders([
+                    'X-Shopify-Access-Token' => $shop->access_token,
+                    'Content-Type' => 'application/json',
+                ])->post($graphqlUrl, $graphqlPayload);
+
+                // Handle GraphQL response
+                $responseData = $response->json();
+                $errors = $responseData['data']['productVariantUpdate']['userErrors'] ?? [];
+
+                if (empty($errors) && $response->successful()) {
+                    \Log::info("✅ Linked variant {$variant['sku']} → mediaId {$mediaId}");
+                } else {
+                    $error = $errors[0]['message'] ?? $response->body();
+                    \Log::error("❌ GraphQL error linking variant {$variant['sku']}: " . $error);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::error("❌ Error in updateImagesToVariantGraphQL: {$e->getMessage()}");
         }
     }
 }
