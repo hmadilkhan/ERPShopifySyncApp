@@ -324,24 +324,20 @@ class ProductSyncController extends Controller
     private function updateImagesToVariant($syncResponse, $shop, $maxAttempts = 3, $delaySeconds = 3)
     {
         try {
-            // 🧩 Extract ERP payload and Shopify product data
             $erpPayload     = $syncResponse['payload']['product'] ?? null;
             $shopifyProduct = $syncResponse['data']['shopify_response']['product'] ?? null;
 
             if (empty($erpPayload) || empty($shopifyProduct)) {
                 \Log::warning("⚠️ Missing ERP payload or Shopify product in sync response");
-                \Log::info($syncResponse);
                 return;
             }
 
             $erpVariants     = $erpPayload['variants'] ?? [];
             $shopifyVariants = $shopifyProduct['variants'] ?? [];
 
-            // 🔁 Retry loop
             for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
                 \Log::info("🔁 Attempt {$attempt}/{$maxAttempts} — fetching latest images for product {$shopifyProduct['id']}");
 
-                // Fetch latest Shopify product data to ensure image IDs are available
                 $fetchUrl = "https://{$shop->shop_domain}/admin/api/2025-01/products/{$shopifyProduct['id']}.json";
                 $productResponse = Http::withHeaders([
                     'X-Shopify-Access-Token' => $shop->access_token,
@@ -354,21 +350,28 @@ class ProductSyncController extends Controller
 
                 $latestProduct = $productResponse->json('product');
                 $shopifyImages = $latestProduct['images'] ?? [];
-                $imageMap = collect($shopifyImages)->mapWithKeys(fn($img) => [$img['src'] => $img['id']]);
 
-                // 🧷 Link variant images
+                // 🔹 Create map of filename → image_id
+                $imageMap = collect($shopifyImages)->mapWithKeys(function ($img) {
+                    $filename = basename(parse_url($img['src'], PHP_URL_PATH));
+                    return [$filename => $img['id']];
+                });
+
+                // 🧩 Link variant images
                 foreach ($shopifyVariants as $variant) {
                     $erpVariant = collect($erpVariants)->firstWhere('sku', $variant['sku']);
-                    if (!$erpVariant || empty($erpVariant['image']['src'])) {
-                        \Log::warning("⚠️ ERP variant or image missing for SKU {$variant['sku']}");
+
+                    if (empty($erpVariant['image']['src'])) {
+                        \Log::warning("⚠️ ERP image missing for SKU {$variant['sku']}");
                         continue;
                     }
 
-                    $variantImageUrl = $erpVariant['image']['src'];
-                    $imageId = $imageMap[$variantImageUrl] ?? null;
+                    $erpImageUrl = $erpVariant['image']['src'];
+                    $erpFilename = basename(parse_url($erpImageUrl, PHP_URL_PATH));
+                    $imageId = $imageMap[$erpFilename] ?? null;
 
                     if (!$imageId) {
-                        \Log::warning("⚠️ Image not found for SKU {$variant['sku']} (Attempt {$attempt})");
+                        \Log::warning("⚠️ Image not found for SKU {$variant['sku']} ({$erpFilename}) (Attempt {$attempt})");
                         continue;
                     }
 
@@ -391,9 +394,10 @@ class ProductSyncController extends Controller
                     }
                 }
 
-                // 🕒 Wait between attempts if not all linked yet
+                // 🕒 Check if all linked
                 $unlinked = collect($erpVariants)->filter(function ($erpVar) use ($imageMap) {
-                    return empty($imageMap[$erpVar['image']['src'] ?? '']);
+                    $filename = basename(parse_url($erpVar['image']['src'] ?? '', PHP_URL_PATH));
+                    return empty($imageMap[$filename]);
                 });
 
                 if ($unlinked->isEmpty()) {
