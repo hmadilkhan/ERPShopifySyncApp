@@ -416,6 +416,7 @@ class ProductSyncController extends Controller
     private function updateImagesToVariantGraphQL($syncResponse, $shop, $maxAttempts = 3, $delaySeconds = 3)
     {
         try {
+            \Log::warning("⚠️ Inside Variant Image");
             $erpPayload     = $syncResponse['payload']['product'] ?? null;
             $shopifyProduct = $syncResponse['data']['shopify_response']['product'] ?? null;
 
