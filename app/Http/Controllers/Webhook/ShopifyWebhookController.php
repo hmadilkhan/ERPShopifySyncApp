@@ -144,6 +144,7 @@ class ShopifyWebhookController extends Controller
             'financial_status'   => $data['financial_status'] ?? 'pending',
             'fulfillment_status' => $data['fulfillment_status'] ?? null,
             'currency'           => $data['currency'] ?? 'PKR',
+            'subtotal_price'     => $data['subtotal_price'] ?? 'PKR',
             'total_price'        => $data['total_price'] ?? 0,
             'tax'                => $data['current_total_tax'] ?? 0,
             'delivery_charges'    => $data['shipping_lines'][0]['price'] ?? 0,
