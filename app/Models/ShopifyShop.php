@@ -18,11 +18,6 @@ class ShopifyShop extends Model
         'erp_secret',
     ];
 
-    // public function erpIntegration()
-    // {
-    //     return $this->belongsTo(ErpIntegration::class);
-    // }
-
     public function erpIntegration()
     {
         return $this->hasOne(ErpIntegration::class, 'shop_id');

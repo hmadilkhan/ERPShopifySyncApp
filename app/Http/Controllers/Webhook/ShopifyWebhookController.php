@@ -145,6 +145,8 @@ class ShopifyWebhookController extends Controller
             'fulfillment_status' => $data['fulfillment_status'] ?? null,
             'currency'           => $data['currency'] ?? 'PKR',
             'total_price'        => $data['total_price'] ?? 0,
+            'tax'                => $data['current_total_tax'] ?? 0,
+            'discount'           => $data['shipping_lines']['discounted_price'] ?? 0,
 
             // 🧾 Line Items Mapping
             'line_items' => $lineItems,
